@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import * as store from "../lib/storage";
 import InvoiceTemplate from "../components/InvoiceTemplate";
@@ -17,7 +17,17 @@ function emptyItem() {
 export default function CreateBill() {
   const navigate = useNavigate();
   const business = store.getBusiness();
-  const [customers, setCustomers] = useState(store.getCustomers());
+  const [customers, setCustomers] = useState([]);
+  const [loadingCustomers, setLoadingCustomers] = useState(true);
+
+  useEffect(() => {
+    store
+      .getCustomers()
+      .then(setCustomers)
+      .catch((err) => setError(`Could not load customers: ${err.message}`))
+      .finally(() => setLoadingCustomers(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [customerId, setCustomerId] = useState("");
   const [customerName, setCustomerName] = useState("");
@@ -31,6 +41,7 @@ export default function CreateBill() {
   const [items, setItems] = useState([emptyItem()]);
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const totals = useMemo(() => store.computeTotals(items), [items]);
 
@@ -40,28 +51,32 @@ export default function CreateBill() {
       return;
     }
     setCustomerId(id);
-    const c = customers.find((x) => x.id === id);
+    const c = customers.find((x) => x._id === id);
     if (c) {
       setCustomerName(c.name);
       setCustomerPhone(c.phone || "");
     }
   }
 
-  function handleAddNewCustomer(e) {
+  async function handleAddNewCustomer(e) {
     e.preventDefault();
     if (!newName.trim()) return;
-    const created = store.saveCustomer({
-      name: newName.trim(),
-      phone: newPhone.trim(),
-    });
-    const list = store.getCustomers();
-    setCustomers(list);
-    setCustomerId(created.id);
-    setCustomerName(created.name);
-    setCustomerPhone(created.phone || "");
-    setNewName("");
-    setNewPhone("");
-    setShowNewCustomer(false);
+    try {
+      const created = await store.saveCustomer({
+        name: newName.trim(),
+        phone: newPhone.trim(),
+      });
+      const list = await store.getCustomers();
+      setCustomers(list);
+      setCustomerId(created._id);
+      setCustomerName(created.name);
+      setCustomerPhone(created.phone || "");
+      setNewName("");
+      setNewPhone("");
+      setShowNewCustomer(false);
+    } catch (err) {
+      alert(err.message);
+    }
   }
 
   function updateItem(id, field, value) {
@@ -90,7 +105,7 @@ export default function CreateBill() {
     return "";
   }
 
-  function handleSave() {
+  async function handleSave() {
     const err = validate();
     if (err) {
       setError(err);
@@ -106,17 +121,22 @@ export default function CreateBill() {
         price: Number(it.price),
       }));
 
-    const bill = store.createBill({
-      billNo: billNo.trim(),
-      customerId: customerId || null,
-      customerName: customerName.trim(),
-      customerPhone: customerPhone.trim(),
-      dateOfIssue,
-      items: cleanItems,
-      note: note.trim(),
-    });
-
-    navigate(`/bills/${bill.id}`, { replace: true });
+    setSaving(true);
+    try {
+      const bill = await store.createBill({
+        billNo: billNo.trim(),
+        customerId: customerId || null,
+        customerName: customerName.trim(),
+        customerPhone: customerPhone.trim(),
+        dateOfIssue,
+        items: cleanItems,
+        note: note.trim(),
+      });
+      navigate(`/bills/${bill._id}`, { replace: true });
+    } catch (err2) {
+      setError(err2.message);
+      setSaving(false);
+    }
   }
 
   const previewBill = {
@@ -146,11 +166,14 @@ export default function CreateBill() {
           <select
             value={customerId}
             onChange={(e) => handleSelectCustomer(e.target.value)}
-            className="h-12 w-full rounded-xl border border-ink-200 bg-white px-4 text-base outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+            disabled={loadingCustomers}
+            className="h-12 w-full rounded-xl border border-ink-200 bg-white px-4 text-base outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 disabled:opacity-60"
           >
-            <option value="">Select a customer…</option>
+            <option value="">
+              {loadingCustomers ? "Loading customers…" : "Select a customer…"}
+            </option>
             {customers.map((c) => (
-              <option key={c.id} value={c.id}>
+              <option key={c._id} value={c._id}>
                 {c.name}
                 {c.phone ? ` · ${c.phone}` : ""}
               </option>
@@ -334,9 +357,10 @@ export default function CreateBill() {
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-ink-100 bg-white p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
         <button
           onClick={handleSave}
-          className="h-13 h-[52px] w-full rounded-xl bg-brand-500 text-base font-semibold text-white shadow-pop active:scale-[0.98]"
+          disabled={saving}
+          className="h-[52px] w-full rounded-xl bg-brand-500 text-base font-semibold text-white shadow-pop active:scale-[0.98] disabled:opacity-60"
         >
-          Save & Generate Invoice
+          {saving ? "Saving…" : "Save & Generate Invoice"}
         </button>
       </div>
 

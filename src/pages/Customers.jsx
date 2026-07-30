@@ -1,14 +1,33 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import * as store from "../lib/storage";
 import { PlusIcon, TrashIcon, UsersIcon, XIcon, PhoneIcon } from "../components/Icons";
 
 export default function Customers() {
-  const [customers, setCustomers] = useState(store.getCustomers());
+  const [customers, setCustomers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  function loadCustomers() {
+    setLoading(true);
+    return store
+      .getCustomers()
+      .then((data) => {
+        setCustomers(data);
+        setError("");
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    loadCustomers();
+  }, []);
 
   function resetForm() {
     setName("");
@@ -31,23 +50,34 @@ export default function Customers() {
     setShowForm(true);
   }
 
-  function handleSave(e) {
+  async function handleSave(e) {
     e.preventDefault();
     if (!name.trim()) return;
-    store.saveCustomer({
-      id: editing?.id,
-      name: name.trim(),
-      phone: phone.trim(),
-      address: address.trim(),
-    });
-    setCustomers(store.getCustomers());
-    resetForm();
+    setSaving(true);
+    try {
+      await store.saveCustomer({
+        id: editing?._id,
+        name: name.trim(),
+        phone: phone.trim(),
+        address: address.trim(),
+      });
+      await loadCustomers();
+      resetForm();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function handleDelete(id) {
+  async function handleDelete(id) {
     if (!confirm("Delete this customer? This won't affect past bills.")) return;
-    store.deleteCustomer(id);
-    setCustomers(store.getCustomers());
+    try {
+      await store.deleteCustomer(id);
+      await loadCustomers();
+    } catch (err) {
+      alert(err.message);
+    }
   }
 
   return (
@@ -63,7 +93,22 @@ export default function Customers() {
       </header>
 
       <main className="px-5 pt-4">
-        {customers.length === 0 ? (
+        {error && (
+          <div className="mb-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+            Could not load customers: {error}. Is the API server running?
+          </div>
+        )}
+
+        {loading ? (
+          <div className="space-y-2.5">
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="h-16 animate-pulse rounded-2xl border border-ink-100 bg-white shadow-card"
+              />
+            ))}
+          </div>
+        ) : customers.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-ink-200 bg-white px-6 py-14 text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-50 text-brand-500">
               <UsersIcon width={26} height={26} />
@@ -79,7 +124,7 @@ export default function Customers() {
           <ul className="space-y-2.5">
             {customers.map((c) => (
               <li
-                key={c.id}
+                key={c._id}
                 className="flex items-center justify-between gap-3 rounded-2xl border border-ink-100 bg-white p-4 shadow-card"
               >
                 <button
@@ -96,7 +141,7 @@ export default function Customers() {
                   )}
                 </button>
                 <button
-                  onClick={() => handleDelete(c.id)}
+                  onClick={() => handleDelete(c._id)}
                   aria-label={`Delete ${c.name}`}
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-ink-400 transition-colors active:bg-red-50 active:text-red-600"
                 >
@@ -169,9 +214,10 @@ export default function Customers() {
 
               <button
                 type="submit"
-                className="h-12 w-full rounded-xl bg-brand-500 text-base font-semibold text-white shadow-card active:scale-[0.98]"
+                disabled={saving}
+                className="h-12 w-full rounded-xl bg-brand-500 text-base font-semibold text-white shadow-card active:scale-[0.98] disabled:opacity-60"
               >
-                {editing ? "Save Changes" : "Add Customer"}
+                {saving ? "Saving…" : editing ? "Save Changes" : "Add Customer"}
               </button>
             </div>
           </form>

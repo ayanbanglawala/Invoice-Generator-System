@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import * as store from "../lib/storage";
 import InvoiceTemplate from "../components/InvoiceTemplate";
@@ -16,17 +16,41 @@ function formatDate(iso) {
 export default function BillView() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const bill = store.getBill(id);
   const business = store.getBusiness();
   const invoiceRef = useRef(null);
+  const [bill, setBill] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  if (!bill) {
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    store
+      .getBill(id)
+      .then((data) => !cancelled && setBill(data))
+      .catch((err) => !cancelled && setLoadError(err.message))
+      .finally(() => !cancelled && setLoading(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-ink-50">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-brand-200 border-t-brand-500" />
+      </div>
+    );
+  }
+
+  if (loadError || !bill) {
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-ink-50 px-6 text-center">
         <p className="text-base font-semibold text-ink-800">
-          Bill not found
+          {loadError ? "Could not load this bill" : "Bill not found"}
         </p>
+        {loadError && <p className="text-sm text-ink-500">{loadError}</p>}
         <Link
           to="/"
           className="rounded-xl bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white"
@@ -73,7 +97,7 @@ export default function BillView() {
   }
 
   function fileBase() {
-    return `Invoice-${bill.billNo || bill.id.slice(0, 6)}-${bill.customerName}`.replace(
+    return `Invoice-${bill.billNo || bill._id.slice(0, 6)}-${bill.customerName}`.replace(
       /\s+/g,
       "_"
     );
@@ -141,10 +165,14 @@ export default function BillView() {
     return store.computeTotals(bill.items || []).totalAmount;
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (!confirm("Delete this bill permanently?")) return;
-    store.deleteBill(bill.id);
-    navigate("/", { replace: true });
+    try {
+      await store.deleteBill(bill._id);
+      navigate("/", { replace: true });
+    } catch (err) {
+      alert(err.message);
+    }
   }
 
   return (

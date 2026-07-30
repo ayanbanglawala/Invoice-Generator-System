@@ -75,8 +75,8 @@ const InvoiceTemplate = forwardRef(function InvoiceTemplate(
               {formatDate(bill.dateOfIssue)}
             </p>
             {bill.billNo && (
-              <p className="mt-1 text-[11px] font-medium text-ink-400">
-                Bill No: {bill.billNo}
+              <p className="mt-1.5 text-lg font-extrabold leading-none text-red-600">
+                {bill.billNo}
               </p>
             )}
           </div>
