@@ -12,7 +12,9 @@ import Settings from "./pages/Settings";
 function Shell() {
   const { loggedIn } = useAuth();
   const location = useLocation();
-  const showNav = loggedIn && location.pathname !== "/login";
+  const hasOwnActionBar =
+    location.pathname === "/bills/new" || /^\/bills\/[^/]+$/.test(location.pathname);
+  const showNav = loggedIn && location.pathname !== "/login" && !hasOwnActionBar;
 
   return (
     <>

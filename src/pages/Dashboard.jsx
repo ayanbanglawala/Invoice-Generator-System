@@ -24,7 +24,7 @@ export default function Dashboard() {
     return bills.filter(
       (b) =>
         b.customerName?.toLowerCase().includes(q) ||
-        b.orderId?.toLowerCase().includes(q)
+        b.billNo?.toLowerCase().includes(q)
     );
   }, [bills, query]);
 
@@ -100,7 +100,7 @@ export default function Dashboard() {
                         {bill.customerName}
                       </p>
                       <p className="mt-0.5 text-xs text-ink-500">
-                        {bill.orderId} · {formatDate(bill.dateOfIssue)}
+                        Bill No: {bill.billNo} · {formatDate(bill.dateOfIssue)}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">

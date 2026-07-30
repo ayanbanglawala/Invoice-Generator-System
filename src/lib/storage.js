@@ -88,20 +88,10 @@ export function getBill(id) {
   return getBills().find((b) => b.id === id) || null;
 }
 
-function nextOrderId() {
-  const bills = read(KEYS.BILLS, []);
-  const max = bills.reduce((m, b) => {
-    const n = parseInt(String(b.orderId || "0").replace(/\D/g, ""), 10);
-    return Number.isFinite(n) ? Math.max(m, n) : m;
-  }, 0);
-  return `ORD-${String(max + 1).padStart(4, "0")}`;
-}
-
 export function createBill(bill) {
   const list = read(KEYS.BILLS, []);
   const newBill = {
     id: crypto.randomUUID(),
-    orderId: nextOrderId(),
     createdAt: new Date().toISOString(),
     ...bill,
   };

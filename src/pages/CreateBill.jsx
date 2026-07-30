@@ -11,7 +11,7 @@ function todayISO() {
 }
 
 function emptyItem() {
-  return { id: crypto.randomUUID(), name: "", qty: 1, price: "" };
+  return { id: crypto.randomUUID(), sr: "", name: "", qty: 1, price: "" };
 }
 
 export default function CreateBill() {
@@ -27,6 +27,7 @@ export default function CreateBill() {
   const [newPhone, setNewPhone] = useState("");
 
   const [dateOfIssue, setDateOfIssue] = useState(todayISO());
+  const [billNo, setBillNo] = useState("");
   const [items, setItems] = useState([emptyItem()]);
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
@@ -80,6 +81,7 @@ export default function CreateBill() {
   }
 
   function validate() {
+    if (!billNo.trim()) return "Please enter a bill / invoice number.";
     if (!customerName.trim()) return "Please select or add a customer.";
     const valid = items.filter(
       (it) => it.name.trim() && Number(it.qty) > 0 && it.price !== ""
@@ -97,13 +99,15 @@ export default function CreateBill() {
     setError("");
     const cleanItems = items
       .filter((it) => it.name.trim() && Number(it.qty) > 0 && it.price !== "")
-      .map((it) => ({
+      .map((it, idx) => ({
+        sr: it.sr.trim() || String(idx + 1),
         name: it.name.trim(),
         qty: Number(it.qty),
         price: Number(it.price),
       }));
 
     const bill = store.createBill({
+      billNo: billNo.trim(),
       customerId: customerId || null,
       customerName: customerName.trim(),
       customerPhone: customerPhone.trim(),
@@ -116,7 +120,7 @@ export default function CreateBill() {
   }
 
   const previewBill = {
-    orderId: "ORD-000X",
+    billNo: billNo || "Your bill number",
     customerName: customerName || "Customer name",
     customerPhone,
     dateOfIssue,
@@ -164,6 +168,20 @@ export default function CreateBill() {
           )}
         </section>
 
+        {/* Bill number */}
+        <section className="rounded-2xl border border-ink-100 bg-white p-4 shadow-card">
+          <label className="mb-1.5 block text-sm font-semibold text-ink-700">
+            Bill / Invoice Number
+          </label>
+          <input
+            value={billNo}
+            onChange={(e) => setBillNo(e.target.value)}
+            placeholder="e.g. INV-101 or 24"
+            className="h-12 w-full rounded-xl border border-ink-200 px-4 text-base outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+            required
+          />
+        </section>
+
         {/* Date */}
         <section className="rounded-2xl border border-ink-100 bg-white p-4 shadow-card">
           <label className="mb-1.5 block text-sm font-semibold text-ink-700">
@@ -196,16 +214,24 @@ export default function CreateBill() {
                 key={item.id}
                 className="rounded-xl border border-ink-100 p-3"
               >
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="text-xs font-semibold text-ink-400">
-                    Item {idx + 1}
-                  </span>
+                <div className="mb-2 flex items-end gap-2">
+                  <div className="w-20 shrink-0">
+                    <label className="mb-1 block text-xs text-ink-500">
+                      SR
+                    </label>
+                    <input
+                      value={item.sr}
+                      onChange={(e) => updateItem(item.id, "sr", e.target.value)}
+                      placeholder={`D${idx + 1}`}
+                      className="h-11 w-full rounded-lg border border-ink-200 px-2 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+                    />
+                  </div>
                   {items.length > 1 && (
                     <button
                       type="button"
                       onClick={() => removeItem(item.id)}
                       aria-label="Remove item"
-                      className="flex h-8 w-8 items-center justify-center rounded-full text-ink-400 active:bg-red-50 active:text-red-600"
+                      className="ml-auto flex h-11 w-11 items-center justify-center rounded-full text-ink-400 active:bg-red-50 active:text-red-600"
                     >
                       <TrashIcon width={15} height={15} />
                     </button>
@@ -286,9 +312,6 @@ export default function CreateBill() {
             placeholder="e.g. Warranty valid for 6 months"
             className="w-full rounded-xl border border-ink-200 px-4 py-3 text-base outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
           />
-          <p className="mt-3 text-xs text-ink-400">
-            Order ID is generated automatically once you save this bill.
-          </p>
         </section>
 
         {error && (

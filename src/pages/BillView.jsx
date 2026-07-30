@@ -37,18 +37,19 @@ export default function BillView() {
     );
   }
 
-  async function buildPdf() {
-    const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
-      import("html2canvas"),
-      import("jspdf"),
-    ]);
-
+  async function captureCanvas() {
+    const { default: html2canvas } = await import("html2canvas");
     const node = invoiceRef.current;
-    const canvas = await html2canvas(node, {
+    return html2canvas(node, {
       scale: 3,
       backgroundColor: "#ffffff",
       useCORS: true,
     });
+  }
+
+  async function buildPdf() {
+    const [{ jsPDF }] = await Promise.all([import("jspdf")]);
+    const canvas = await captureCanvas();
     const imgData = canvas.toDataURL("image/png");
 
     // Convert the captured pixel canvas into an A4-proportioned PDF page,
@@ -71,11 +72,34 @@ export default function BillView() {
     return pdf;
   }
 
-  async function handleDownload() {
+  function fileBase() {
+    return `Invoice-${bill.billNo || bill.id.slice(0, 6)}-${bill.customerName}`.replace(
+      /\s+/g,
+      "_"
+    );
+  }
+
+  async function handleDownloadJpg() {
+    setBusy(true);
+    try {
+      const canvas = await captureCanvas();
+      const link = document.createElement("a");
+      link.download = `${fileBase()}.jpg`;
+      link.href = canvas.toDataURL("image/jpeg", 0.95);
+      link.click();
+    } catch (err) {
+      console.error(err);
+      alert("Could not generate the image. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDownloadPdf() {
     setBusy(true);
     try {
       const pdf = await buildPdf();
-      pdf.save(`Invoice-${bill.orderId}-${bill.customerName}.pdf`);
+      pdf.save(`${fileBase()}.pdf`);
     } catch (err) {
       console.error(err);
       alert("Could not generate the PDF. Please try again.");
@@ -89,13 +113,13 @@ export default function BillView() {
     try {
       const pdf = await buildPdf();
       const blob = pdf.output("blob");
-      const fileName = `Invoice-${bill.orderId}.pdf`;
+      const fileName = `${fileBase()}.pdf`;
       const file = new File([blob], fileName, { type: "application/pdf" });
 
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({
           files: [file],
-          title: `Invoice ${bill.orderId}`,
+          title: `Invoice ${bill.billNo}`,
           text: `Invoice for ${bill.customerName} — ₹${totalAmount().toLocaleString(
             "en-IN"
           )}`,
@@ -131,7 +155,7 @@ export default function BillView() {
             Bills
           </Link>
           <ChevronRightIcon width={14} height={14} />
-          <span className="text-ink-600">{bill.orderId}</span>
+          <span className="text-ink-600">{bill.billNo}</span>
         </div>
         <div className="mt-2 flex items-center justify-between">
           <div>
@@ -139,7 +163,7 @@ export default function BillView() {
               {bill.customerName}
             </h1>
             <p className="mt-0.5 text-sm text-ink-500">
-              {bill.orderId} · {formatDate(bill.dateOfIssue)}
+              Bill No: {bill.billNo} · {formatDate(bill.dateOfIssue)}
             </p>
           </div>
           <button
@@ -159,19 +183,27 @@ export default function BillView() {
       </main>
 
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-ink-100 bg-white p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
-        <div className="mx-auto flex max-w-md gap-3">
+        <div className="mx-auto flex max-w-md gap-2">
           <button
-            onClick={handleDownload}
+            onClick={handleDownloadJpg}
             disabled={busy}
-            className="flex h-12 flex-1 items-center justify-center gap-2 rounded-xl border border-ink-200 bg-white text-sm font-semibold text-ink-700 active:scale-[0.98] disabled:opacity-60"
+            className="flex h-12 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl border border-ink-200 bg-white text-xs font-semibold text-ink-700 active:scale-[0.98] disabled:opacity-60"
           >
-            <DownloadIcon width={18} height={18} />
-            {busy ? "Working…" : "Download PDF"}
+            <DownloadIcon width={17} height={17} />
+            JPG
+          </button>
+          <button
+            onClick={handleDownloadPdf}
+            disabled={busy}
+            className="flex h-12 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl border border-ink-200 bg-white text-xs font-semibold text-ink-700 active:scale-[0.98] disabled:opacity-60"
+          >
+            <DownloadIcon width={17} height={17} />
+            PDF
           </button>
           <button
             onClick={handleShare}
             disabled={busy}
-            className="flex h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-brand-500 text-sm font-semibold text-white shadow-card active:scale-[0.98] disabled:opacity-60"
+            className="flex h-12 flex-[1.4] items-center justify-center gap-2 rounded-xl bg-brand-500 text-sm font-semibold text-white shadow-card active:scale-[0.98] disabled:opacity-60"
           >
             <ShareIcon width={18} height={18} />
             {busy ? "Working…" : "Share"}

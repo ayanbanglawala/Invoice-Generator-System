@@ -74,9 +74,9 @@ const InvoiceTemplate = forwardRef(function InvoiceTemplate(
             <p className="text-[13px] font-semibold text-ink-900">
               {formatDate(bill.dateOfIssue)}
             </p>
-            {bill.orderId && (
+            {bill.billNo && (
               <p className="mt-1 text-[11px] font-medium text-ink-400">
-                {bill.orderId}
+                Bill No: {bill.billNo}
               </p>
             )}
           </div>
@@ -97,7 +97,7 @@ const InvoiceTemplate = forwardRef(function InvoiceTemplate(
           <tbody>
             {items.map((item, idx) => (
               <tr key={idx} className="border-b border-ink-100 align-top">
-                <td className="py-2.5 text-ink-500">{idx + 1}</td>
+                <td className="py-2.5 text-ink-500">{item.sr || idx + 1}</td>
                 <td className="py-2.5 pr-2 font-medium text-ink-800">
                   {item.name}
                 </td>
