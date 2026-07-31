@@ -21,7 +21,29 @@ A mobile-first React + Vite + Tailwind app to create branded invoices, backed by
    ```
    Or run them separately in two terminals: `npm run dev` (frontend) and `npm run server` (API).
 
-The frontend talks to the API at `VITE_API_URL` (default `http://localhost:5000/api`).
+   **Important:** if you see "Could not reach the API" or "Failed to fetch"
+   in the app, it means only the frontend is running. `npm run dev` alone
+   does *not* start the API — use `npm run dev:all`, or start `npm run
+   server` in a second terminal.
+
+   Alternatively, to test the exact Vercel serverless setup locally instead
+   of the Express server — same behavior you'll get in production — install
+   the Vercel CLI (`npm i -g vercel`), run `vercel link` once to connect
+   this folder to your Vercel project, then:
+   ```bash
+   npm run dev:vercel
+   ```
+   This serves the frontend and the `/api` functions together on one port,
+   exactly like the real deployment.
+
+   `npm run dev:all` (the Express version) is for local development only —
+   **don't** use it as a Vercel build/dev command. Vercel doesn't run
+   persistent servers; it builds the frontend as static files and deploys
+   everything in `/api` as serverless functions automatically. The
+   `server/` folder is ignored on Vercel entirely.
+
+The frontend talks to the API at `VITE_API_URL` (default `/api`, same
+origin — see `.env.example` for the local-Express override).
 
 ## Login
 

@@ -1,10 +1,17 @@
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 
 async function request(path, options = {}) {
-  const res = await fetch(`${API_URL}${path}`, {
-    headers: { "Content-Type": "application/json" },
-    ...options,
-  });
+  let res;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      headers: { "Content-Type": "application/json" },
+      ...options,
+    });
+  } catch {
+    throw new Error(
+      `Could not reach the API at ${API_URL}. Make sure the backend is running (or, on Vercel, that the deployment finished and MONGODB_URI is set).`
+    );
+  }
   if (!res.ok) {
     let message = `Request failed (${res.status})`;
     try {

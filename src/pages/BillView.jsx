@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
+import html2canvas from "html2canvas";
+import { jsPDF } from "jspdf";
 import * as store from "../lib/storage";
 import InvoiceTemplate from "../components/InvoiceTemplate";
 import { DownloadIcon, ShareIcon, TrashIcon, ChevronRightIcon } from "../components/Icons";
@@ -62,17 +64,15 @@ export default function BillView() {
   }
 
   async function captureCanvas() {
-    const { default: html2canvas } = await import("html2canvas");
     const node = invoiceRef.current;
     return html2canvas(node, {
-      scale: 3,
+      scale: 2.5,
       backgroundColor: "#ffffff",
       useCORS: true,
     });
   }
 
   async function buildPdf() {
-    const [{ jsPDF }] = await Promise.all([import("jspdf")]);
     const canvas = await captureCanvas();
     const imgData = canvas.toDataURL("image/png");
 
@@ -139,8 +139,12 @@ export default function BillView() {
       const blob = pdf.output("blob");
       const fileName = `${fileBase()}.pdf`;
       const file = new File([blob], fileName, { type: "application/pdf" });
+      const canShareFile =
+        typeof navigator.share === "function" &&
+        typeof navigator.canShare === "function" &&
+        navigator.canShare({ files: [file] });
 
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      if (canShareFile) {
         await navigator.share({
           files: [file],
           title: `Invoice ${bill.billNo}`,
@@ -152,9 +156,15 @@ export default function BillView() {
         pdf.save(fileName);
       }
     } catch (err) {
-      if (err?.name !== "AbortError") {
-        console.error(err);
-        alert("Could not share the PDF. It has been downloaded instead.");
+      // AbortError = user closed the share sheet, nothing to do.
+      // NotAllowedError = iOS Safari decided too much time passed since the
+      // tap to trust this as a real user action — just fall back quietly.
+      if (err?.name === "AbortError") return;
+      try {
+        const pdf = await buildPdf();
+        pdf.save(`${fileBase()}.pdf`);
+      } catch {
+        alert("Could not generate the PDF. Please try again.");
       }
     } finally {
       setBusy(false);

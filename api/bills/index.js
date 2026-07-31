@@ -1,7 +1,9 @@
 import connectDb from "../_db.js";
+import { applyCors } from "../_cors.js";
 import Bill from "../../server/models/Bill.js";
 
 export default async function handler(req, res) {
+  if (applyCors(req, res)) return;
   await connectDb();
 
   if (req.method === "GET") {
