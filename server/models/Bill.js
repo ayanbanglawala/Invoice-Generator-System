@@ -31,7 +31,7 @@ const billSchema = new mongoose.Schema(
 billSchema.index({ monthKey: -1, dateOfIssue: -1 });
 billSchema.index({ billNo: 1 });
 
-billSchema.pre("validate", function computeDerivedFields(next) {
+billSchema.pre("validate", function computeDerivedFields() {
   if (this.items?.length) {
     this.totalAmount = this.items.reduce(
       (sum, it) => sum + Number(it.qty || 0) * Number(it.price || 0),
@@ -47,7 +47,6 @@ billSchema.pre("validate", function computeDerivedFields(next) {
     this.monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     this.monthLabel = `${monthNames[d.getMonth()]} ${d.getFullYear()}`;
   }
-  next();
 });
 
 export default mongoose.model("Bill", billSchema);
