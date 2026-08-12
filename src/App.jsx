@@ -7,6 +7,7 @@ import Dashboard from "./pages/Dashboard";
 import CreateBill from "./pages/CreateBill";
 import BillView from "./pages/BillView";
 import Customers from "./pages/Customers";
+import Parcels from "./pages/Parcels";
 import Settings from "./pages/Settings";
 
 function Shell() {
@@ -49,6 +50,14 @@ function Shell() {
           element={
             <ProtectedRoute>
               <Customers />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/parcels"
+          element={
+            <ProtectedRoute>
+              <Parcels />
             </ProtectedRoute>
           }
         />

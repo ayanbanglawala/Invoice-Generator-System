@@ -122,6 +122,42 @@ export function SearchIcon(props) {
   );
 }
 
+export function CameraIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z" />
+      <circle cx="12" cy="13.5" r="3.5" />
+    </svg>
+  );
+}
+
+export function PackageIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="m3.5 7.5 8.5-4 8.5 4-8.5 4-8.5-4Z" />
+      <path d="M3.5 7.5v9l8.5 4 8.5-4v-9" />
+      <path d="M12 11.5v9" />
+    </svg>
+  );
+}
+
+export function CheckIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M5 13l4 4L19 7" />
+    </svg>
+  );
+}
+
+export function CheckCircleIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="m8.5 12.5 2.5 2.5 4.5-5" />
+    </svg>
+  );
+}
+
 export function ReceiptIcon(props) {
   return (
     <svg {...base} {...props}>

@@ -6,6 +6,7 @@ const itemSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
     qty: { type: Number, required: true, min: 0 },
     price: { type: Number, required: true, min: 0 },
+    parcelId: { type: mongoose.Schema.Types.ObjectId, ref: "Parcel", default: null },
   },
   { _id: false }
 );

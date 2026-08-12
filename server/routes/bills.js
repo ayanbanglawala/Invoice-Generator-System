@@ -1,7 +1,17 @@
 import { Router } from "express";
 import Bill from "../models/Bill.js";
+import Parcel from "../models/Parcel.js";
 
 const router = Router();
+
+async function linkParcelsToBill(items, billId) {
+  const parcelIds = items.map((it) => it.parcelId).filter(Boolean);
+  if (parcelIds.length === 0) return;
+  await Parcel.updateMany(
+    { _id: { $in: parcelIds } },
+    { $addToSet: { billedBillIds: billId } }
+  );
+}
 
 // GET /api/bills — flat list, most recent first
 router.get("/", async (req, res) => {
@@ -69,6 +79,8 @@ router.post("/", async (req, res) => {
       items,
       note: (note || "").trim(),
     });
+
+    await linkParcelsToBill(items, bill._id);
 
     res.status(201).json(bill);
   } catch (err) {

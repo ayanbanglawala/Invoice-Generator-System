@@ -143,6 +143,12 @@ logs** for a MongoDB connection error (usually a wrong password, missing
 Any `git push` to the connected branch triggers a new Vercel deployment
 automatically.
 
+## Parcels module (photo → WhatsApp → invoice)
+
+See **`PARCELS_SETUP.md`** for the full guide — it covers the Vercel Blob
+storage setup (free image hosting) and how the Parcels tab connects into
+bill creation.
+
 ## Tech
 
 - Vite + React + React Router, Tailwind CSS

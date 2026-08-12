@@ -1,6 +1,16 @@
 import connectDb from "../_db.js";
 import { applyCors } from "../_cors.js";
 import Bill from "../../server/models/Bill.js";
+import Parcel from "../../server/models/Parcel.js";
+
+async function linkParcelsToBill(items, billId) {
+  const parcelIds = items.map((it) => it.parcelId).filter(Boolean);
+  if (parcelIds.length === 0) return;
+  await Parcel.updateMany(
+    { _id: { $in: parcelIds } },
+    { $addToSet: { billedBillIds: billId } }
+  );
+}
 
 export default async function handler(req, res) {
   if (applyCors(req, res)) return;
@@ -35,6 +45,8 @@ export default async function handler(req, res) {
         items,
         note: (note || "").trim(),
       });
+
+      await linkParcelsToBill(items, bill._id);
 
       return res.status(201).json(bill);
     } catch (err) {

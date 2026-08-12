@@ -76,3 +76,19 @@ export function computeTotals(items) {
   );
   return { totalQty, totalAmount };
 }
+
+// ---------- Parcels (photo staging, pre-invoice) ----------
+export function getParcels() {
+  return request("/parcels");
+}
+
+export function createParcel(payload) {
+  return request("/parcels", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteParcel(id) {
+  return request(`/parcels/${id}`, { method: "DELETE" });
+}

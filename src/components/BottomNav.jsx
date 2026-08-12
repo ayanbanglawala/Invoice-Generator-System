@@ -1,8 +1,12 @@
 import { NavLink } from "react-router-dom";
-import { HomeIcon, PlusIcon, UsersIcon, SettingsIcon } from "./Icons";
+import { HomeIcon, PlusIcon, PackageIcon, UsersIcon, SettingsIcon } from "./Icons";
 
-const tabs = [
+const leftTabs = [
   { to: "/", label: "Bills", Icon: HomeIcon, end: true },
+  { to: "/parcels", label: "Parcels", Icon: PackageIcon },
+];
+
+const rightTabs = [
   { to: "/customers", label: "Customers", Icon: UsersIcon },
   { to: "/settings", label: "Settings", Icon: SettingsIcon },
 ];
@@ -10,8 +14,8 @@ const tabs = [
 export default function BottomNav() {
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 border-t border-ink-100 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
-      <div className="mx-auto flex max-w-md items-stretch justify-between px-2">
-        {tabs.slice(0, 1).map((t) => (
+      <div className="mx-auto flex max-w-md items-stretch justify-between px-1">
+        {leftTabs.map((t) => (
           <TabLink key={t.to} {...t} />
         ))}
 
@@ -27,7 +31,7 @@ export default function BottomNav() {
           </span>
         </NavLink>
 
-        {tabs.slice(1).map((t) => (
+        {rightTabs.map((t) => (
           <TabLink key={t.to} {...t} />
         ))}
       </div>
@@ -41,18 +45,14 @@ function TabLink({ to, label, Icon, end }) {
       to={to}
       end={end}
       className={({ isActive }) =>
-        `flex min-w-[64px] flex-1 flex-col items-center justify-center gap-1 py-2.5 text-[11px] font-medium transition-colors ${
+        `flex min-w-[56px] flex-1 flex-col items-center justify-center gap-1 py-2.5 text-[10px] font-medium transition-colors ${
           isActive ? "text-brand-600" : "text-ink-400"
         }`
       }
     >
       {({ isActive }) => (
         <>
-          <Icon
-            width={22}
-            height={22}
-            strokeWidth={isActive ? 2.2 : 1.8}
-          />
+          <Icon width={20} height={20} strokeWidth={isActive ? 2.2 : 1.8} />
           {label}
         </>
       )}

@@ -11,7 +11,18 @@ function todayISO() {
 }
 
 function emptyItem() {
-  return { id: crypto.randomUUID(), sr: "", name: "", qty: 1, price: "" };
+  return { id: crypto.randomUUID(), sr: "", name: "", qty: 1, price: "", parcelId: null };
+}
+
+function itemFromParcel(parcel) {
+  return {
+    id: crypto.randomUUID(),
+    sr: parcel.dNumber,
+    name: parcel.note,
+    qty: 1,
+    price: "",
+    parcelId: parcel._id,
+  };
 }
 
 export default function CreateBill() {
@@ -19,6 +30,9 @@ export default function CreateBill() {
   const business = store.getBusiness();
   const [customers, setCustomers] = useState([]);
   const [loadingCustomers, setLoadingCustomers] = useState(true);
+  const [parcels, setParcels] = useState([]);
+  const [showAllParcels, setShowAllParcels] = useState(false);
+  const [selectedParcelId, setSelectedParcelId] = useState("");
 
   useEffect(() => {
     store
@@ -26,6 +40,7 @@ export default function CreateBill() {
       .then(setCustomers)
       .catch((err) => setError(`Could not load customers: ${err.message}`))
       .finally(() => setLoadingCustomers(false));
+    store.getParcels().then(setParcels).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -89,6 +104,31 @@ export default function CreateBill() {
     setItems((prev) => [...prev, emptyItem()]);
   }
 
+  function addItemFromParcel(parcelId) {
+    if (!parcelId) return;
+    const parcel = parcels.find((p) => p._id === parcelId);
+    if (!parcel) return;
+    setItems((prev) => {
+      // Replace a single still-blank row instead of stacking an empty one.
+      const blankIdx = prev.findIndex(
+        (it) => !it.parcelId && !it.name.trim() && it.price === ""
+      );
+      const newItem = itemFromParcel(parcel);
+      if (blankIdx !== -1) {
+        const next = [...prev];
+        next[blankIdx] = newItem;
+        return next;
+      }
+      return [...prev, newItem];
+    });
+    setSelectedParcelId("");
+  }
+
+  const usedParcelIds = new Set(items.map((it) => it.parcelId).filter(Boolean));
+  const availableParcels = parcels.filter(
+    (p) => !usedParcelIds.has(p._id) && (showAllParcels || !p.billedBillIds?.length)
+  );
+
   function removeItem(id) {
     setItems((prev) =>
       prev.length > 1 ? prev.filter((it) => it.id !== id) : prev
@@ -119,6 +159,7 @@ export default function CreateBill() {
         name: it.name.trim(),
         qty: Number(it.qty),
         price: Number(it.price),
+        parcelId: it.parcelId || null,
       }));
 
     setSaving(true);
@@ -231,6 +272,40 @@ export default function CreateBill() {
             </button>
           </div>
 
+          {parcels.length > 0 && (
+            <div className="mb-3 rounded-xl border border-blue-100 bg-blue-50/60 p-3">
+              <label className="mb-1.5 block text-xs font-semibold text-blue-800">
+                Add from Parcels
+              </label>
+              <select
+                value={selectedParcelId}
+                onChange={(e) => addItemFromParcel(e.target.value)}
+                className="h-11 w-full rounded-lg border border-blue-200 bg-white px-3 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+              >
+                <option value="">
+                  {availableParcels.length === 0
+                    ? "No parcels available"
+                    : "Select a parcel photo…"}
+                </option>
+                {availableParcels.map((p) => (
+                  <option key={p._id} value={p._id}>
+                    {p.dNumber} — {p.note} ({p.customerName})
+                    {p.billedBillIds?.length ? " · already billed" : ""}
+                  </option>
+                ))}
+              </select>
+              <label className="mt-2 flex items-center gap-2 text-xs font-medium text-blue-800">
+                <input
+                  type="checkbox"
+                  checked={showAllParcels}
+                  onChange={(e) => setShowAllParcels(e.target.checked)}
+                  className="h-4 w-4 rounded border-blue-300"
+                />
+                Show already-billed photos too (for dealer bills)
+              </label>
+            </div>
+          )}
+
           <div className="space-y-3">
             {items.map((item, idx) => (
               <div
@@ -249,6 +324,11 @@ export default function CreateBill() {
                       className="h-11 w-full rounded-lg border border-ink-200 px-2 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
                     />
                   </div>
+                  {item.parcelId && (
+                    <span className="mb-0.5 rounded-full bg-blue-50 px-2 py-1 text-[10px] font-semibold text-blue-700">
+                      From Parcel
+                    </span>
+                  )}
                   {items.length > 1 && (
                     <button
                       type="button"
