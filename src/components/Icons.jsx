@@ -131,6 +131,24 @@ export function CameraIcon(props) {
   );
 }
 
+export function ImageUploadIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="3" y="4" width="18" height="15" rx="2" />
+      <circle cx="8.5" cy="9.5" r="1.5" />
+      <path d="m4 17 5-5 3.5 3.5L17 11l3 3" />
+    </svg>
+  );
+}
+
+export function ChevronDownIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  );
+}
+
 export function PackageIcon(props) {
   return (
     <svg {...base} {...props}>

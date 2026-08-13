@@ -4,12 +4,14 @@ import { fileToCompressedDataUrl, dataUrlToFile } from "../lib/image";
 import {
   PlusIcon,
   CameraIcon,
+  ImageUploadIcon,
   PackageIcon,
   ShareIcon,
   TrashIcon,
   XIcon,
   CheckIcon,
   CheckCircleIcon,
+  ChevronDownIcon,
 } from "../components/Icons";
 
 function formatDateTime(iso) {
@@ -46,6 +48,7 @@ export default function Parcels() {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [sharingSelected, setSharingSelected] = useState(false);
+  const [openCustomer, setOpenCustomer] = useState(null);
 
   function loadParcels() {
     setLoading(true);
@@ -137,8 +140,21 @@ export default function Parcels() {
     }
   }
 
-  const pending = parcels.filter((p) => !p.billedBillIds?.length);
-  const billed = parcels.filter((p) => p.billedBillIds?.length);
+  const pendingCount = parcels.filter((p) => !p.billedBillIds?.length).length;
+  const billedCount = parcels.length - pendingCount;
+
+  // Group by customer, most recently active customer first.
+  const groupMap = new Map();
+  for (const p of parcels) {
+    const key = p.customerId || p.customerName;
+    if (!groupMap.has(key)) {
+      groupMap.set(key, { key, customerName: p.customerName, parcels: [] });
+    }
+    groupMap.get(key).parcels.push(p);
+  }
+  const customerGroups = Array.from(groupMap.values()).sort(
+    (a, b) => new Date(b.parcels[0].createdAt) - new Date(a.parcels[0].createdAt)
+  );
 
   return (
     <div className="min-h-dvh bg-ink-50 pb-28">
@@ -146,7 +162,7 @@ export default function Parcels() {
         <div>
           <h1 className="text-xl font-bold text-ink-900">Parcels</h1>
           <p className="mt-0.5 text-sm text-ink-500">
-            {pending.length} pending · {billed.length} billed
+            {pendingCount} pending · {billedCount} billed
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -193,29 +209,56 @@ export default function Parcels() {
             </p>
           </div>
         ) : (
-          <div className="space-y-6">
-            {pending.length > 0 && (
-              <ParcelGrid
-                title="Pending"
-                parcels={pending}
-                selectMode={selectMode}
-                selectedIds={selectedIds}
-                onToggleSelect={toggleSelected}
-                onShare={handleShareOne}
-                onDelete={handleDelete}
-              />
-            )}
-            {billed.length > 0 && (
-              <ParcelGrid
-                title="Billed"
-                parcels={billed}
-                selectMode={selectMode}
-                selectedIds={selectedIds}
-                onToggleSelect={toggleSelected}
-                onShare={handleShareOne}
-                onDelete={handleDelete}
-              />
-            )}
+          <div className="space-y-3">
+            {customerGroups.map((group) => {
+              const isOpen = openCustomer === group.key || selectMode;
+              const groupPending = group.parcels.filter((p) => !p.billedBillIds?.length).length;
+              return (
+                <section
+                  key={group.key}
+                  className="overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-card"
+                >
+                  <button
+                    onClick={() => setOpenCustomer(isOpen && !selectMode ? null : group.key)}
+                    className="flex w-full items-center justify-between px-4 py-3.5"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-[15px] font-bold text-ink-900">
+                        {group.customerName}
+                      </span>
+                      <span className="rounded-full bg-ink-50 px-2 py-0.5 text-xs font-semibold text-ink-500">
+                        {group.parcels.length}
+                      </span>
+                      {groupPending > 0 && (
+                        <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                          {groupPending} pending
+                        </span>
+                      )}
+                    </div>
+                    <ChevronDownIcon
+                      width={18}
+                      height={18}
+                      className={`text-ink-300 transition-transform ${
+                        isOpen ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+
+                  {isOpen && (
+                    <div className="border-t border-ink-100 p-3">
+                      <ParcelGrid
+                        parcels={group.parcels}
+                        selectMode={selectMode}
+                        selectedIds={selectedIds}
+                        onToggleSelect={toggleSelected}
+                        onShare={handleShareOne}
+                        onDelete={handleDelete}
+                      />
+                    </div>
+                  )}
+                </section>
+              );
+            })}
           </div>
         )}
       </main>
@@ -244,12 +287,12 @@ export default function Parcels() {
   );
 }
 
-function ParcelGrid({ title, parcels, selectMode, selectedIds, onToggleSelect, onShare, onDelete }) {
+function ParcelGrid({ parcels, selectMode, selectedIds, onToggleSelect, onShare, onDelete }) {
   return (
-    <section>
-      <h2 className="mb-2 px-1 text-sm font-semibold text-ink-700">{title}</h2>
-      <div className="grid grid-cols-2 gap-3">
-        {parcels.map((p) => (
+    <div className="grid grid-cols-2 gap-3">
+      {parcels.map((p) => {
+        const isBilled = !!p.billedBillIds?.length;
+        return (
           <div
             key={p._id}
             onClick={() => selectMode && onToggleSelect(p._id)}
@@ -282,6 +325,11 @@ function ParcelGrid({ title, parcels, selectMode, selectedIds, onToggleSelect, o
               <span className="absolute left-2 top-2 rounded-full bg-blue-600 px-2 py-0.5 text-xs font-extrabold text-white shadow">
                 {p.dNumber}
               </span>
+              {isBilled && (
+                <span className="absolute bottom-2 left-2 rounded-full bg-green-600 px-2 py-0.5 text-[10px] font-bold text-white shadow">
+                  Billed
+                </span>
+              )}
             </div>
             <div className="p-2.5">
               <p className="truncate text-[13px] font-semibold text-ink-900">
@@ -316,14 +364,15 @@ function ParcelGrid({ title, parcels, selectMode, selectedIds, onToggleSelect, o
               )}
             </div>
           </div>
-        ))}
-      </div>
-    </section>
+        );
+      })}
+    </div>
   );
 }
 
 function CaptureSheet({ customers, onClose, onSaved }) {
-  const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
+  const galleryInputRef = useRef(null);
   const [dataUrl, setDataUrl] = useState(null);
   const [customerId, setCustomerId] = useState("");
   const [customerName, setCustomerName] = useState("");
@@ -460,31 +509,55 @@ function CaptureSheet({ customers, onClose, onSaved }) {
         ) : (
           <div className="space-y-4">
             <input
-              ref={fileInputRef}
+              ref={cameraInputRef}
               type="file"
               accept="image/*"
               capture="environment"
               onChange={handleFileChange}
               className="hidden"
             />
+            <input
+              ref={galleryInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              className="hidden"
+            />
             {dataUrl ? (
               <div className="relative overflow-hidden rounded-2xl border border-ink-100">
                 <img src={dataUrl} alt="Parcel preview" className="max-h-64 w-full object-cover" />
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="absolute bottom-2 right-2 rounded-full bg-black/60 px-3 py-1.5 text-xs font-semibold text-white"
-                >
-                  Retake
-                </button>
+                <div className="absolute bottom-2 right-2 flex gap-1.5">
+                  <button
+                    onClick={() => cameraInputRef.current?.click()}
+                    className="rounded-full bg-black/60 px-3 py-1.5 text-xs font-semibold text-white"
+                  >
+                    Retake
+                  </button>
+                  <button
+                    onClick={() => galleryInputRef.current?.click()}
+                    className="rounded-full bg-black/60 px-3 py-1.5 text-xs font-semibold text-white"
+                  >
+                    Choose Different
+                  </button>
+                </div>
               </div>
             ) : (
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="flex h-44 w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-ink-200 bg-ink-50 text-ink-400"
-              >
-                <CameraIcon width={32} height={32} />
-                <span className="text-sm font-medium">Tap to take or choose a photo</span>
-              </button>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="flex h-32 flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-ink-200 bg-ink-50 text-ink-400"
+                >
+                  <CameraIcon width={28} height={28} />
+                  <span className="text-xs font-medium">Take Photo</span>
+                </button>
+                <button
+                  onClick={() => galleryInputRef.current?.click()}
+                  className="flex h-32 flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-ink-200 bg-ink-50 text-ink-400"
+                >
+                  <ImageUploadIcon width={28} height={28} />
+                  <span className="text-xs font-medium">Upload Image</span>
+                </button>
+              </div>
             )}
 
             <div>
