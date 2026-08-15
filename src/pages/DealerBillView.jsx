@@ -5,7 +5,7 @@ import { jsPDF } from "jspdf";
 import * as store from "../lib/storage";
 import DealerManifestTemplate from "../components/DealerManifestTemplate";
 import InvoiceTemplate from "../components/InvoiceTemplate";
-import { DownloadIcon, ShareIcon, ChevronRightIcon, TrashIcon } from "../components/Icons";
+import { DownloadIcon, ShareIcon, ChevronRightIcon, TrashIcon, PackageIcon } from "../components/Icons";
 
 export default function DealerBillView() {
   const { id } = useParams();
@@ -16,7 +16,7 @@ export default function DealerBillView() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [editing, setEditing] = useState(false);
+  const [editMode, setEditMode] = useState(null); // null | "prices" | "items"
 
   function load() {
     setLoading(true);
@@ -207,13 +207,22 @@ export default function DealerBillView() {
       </header>
 
       <main className="px-5 pt-5">
-        {editing ? (
+        {editMode === "prices" ? (
           <PricingForm
             bill={bill}
-            onCancel={() => setEditing(false)}
+            onCancel={() => setEditMode(null)}
             onSaved={(updated) => {
               setBill(updated);
-              setEditing(false);
+              setEditMode(null);
+            }}
+          />
+        ) : editMode === "items" ? (
+          <ItemsEditForm
+            bill={bill}
+            onCancel={() => setEditMode(null)}
+            onSaved={(updated) => {
+              setBill(updated);
+              setEditMode(null);
             }}
           />
         ) : (
@@ -226,17 +235,25 @@ export default function DealerBillView() {
               )}
             </div>
 
-            <button
-              onClick={() => setEditing(true)}
-              className="mt-4 flex h-11 w-full items-center justify-center rounded-xl border border-indigo-200 bg-indigo-50 text-sm font-semibold text-indigo-700 active:scale-[0.98]"
-            >
-              {bill.status === "priced" ? "Edit Prices" : "Add Prices"}
-            </button>
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={() => setEditMode("items")}
+                className="flex h-11 flex-1 items-center justify-center gap-1.5 rounded-xl border border-indigo-200 bg-white text-sm font-semibold text-indigo-700 active:scale-[0.98]"
+              >
+                <PackageIcon width={16} height={16} /> Edit Items
+              </button>
+              <button
+                onClick={() => setEditMode("prices")}
+                className="flex h-11 flex-1 items-center justify-center rounded-xl border border-indigo-200 bg-indigo-50 text-sm font-semibold text-indigo-700 active:scale-[0.98]"
+              >
+                {bill.status === "priced" ? "Edit Prices" : "Add Prices"}
+              </button>
+            </div>
           </>
         )}
       </main>
 
-      {!editing && (
+      {!editMode && (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-ink-100 bg-white p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
           <div className="mx-auto flex max-w-md gap-2">
             <button
@@ -380,6 +397,137 @@ function PricingForm({ bill, onCancel, onSaved }) {
           className="h-12 flex-[2] rounded-xl bg-indigo-600 text-sm font-semibold text-white shadow-card active:scale-[0.98] disabled:opacity-60"
         >
           {saving ? "Saving…" : "Save & Generate Invoice"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ItemsEditForm({ bill, onCancel, onSaved }) {
+  const [allParcels, setAllParcels] = useState([]);
+  const [loadingParcels, setLoadingParcels] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [selectedIds, setSelectedIds] = useState(
+    new Set(bill.items.map((it) => String(it.parcelId)))
+  );
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    store
+      .getParcels()
+      .then((data) => {
+        setAllParcels(data);
+        setLoadError("");
+      })
+      .catch((err) => setLoadError(err.message))
+      .finally(() => setLoadingParcels(false));
+  }, []);
+
+  function toggle(id) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  // Selectable = already in this bundle, or not claimed by any bundle yet.
+  const selectable = allParcels.filter(
+    (p) => !p.dealerBillId || String(p.dealerBillId?._id || p.dealerBillId) === String(bill._id)
+  );
+
+  async function handleSave() {
+    if (selectedIds.size === 0) {
+      setError("Select at least one piece — or delete this dealer bill instead of emptying it.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      const updated = await store.updateDealerBillItems(bill._id, {
+        parcelIds: Array.from(selectedIds),
+      });
+      onSaved(updated);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-3.5 text-sm font-medium text-indigo-800">
+        {selectedIds.size} piece{selectedIds.size === 1 ? "" : "s"} selected for{" "}
+        <span className="font-bold">{bill.billNo}</span>. Tick to add, untick to remove.
+      </div>
+
+      <div className="rounded-2xl border border-ink-100 bg-white p-4 shadow-card">
+        {loadingParcels ? (
+          <div className="space-y-2.5">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="h-14 animate-pulse rounded-xl bg-ink-50" />
+            ))}
+          </div>
+        ) : loadError ? (
+          <p className="text-sm text-red-600">Could not load parcels: {loadError}</p>
+        ) : selectable.length === 0 ? (
+          <p className="text-sm text-ink-500">No parcel photos available.</p>
+        ) : (
+          <div className="max-h-[50vh] space-y-2 overflow-y-auto">
+            {selectable.map((p) => {
+              const checked = selectedIds.has(p._id);
+              return (
+                <label
+                  key={p._id}
+                  className={`flex cursor-pointer items-center gap-3 rounded-xl border p-2.5 ${
+                    checked ? "border-indigo-300 bg-indigo-50/60" : "border-ink-100"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggle(p._id)}
+                    className="h-5 w-5 shrink-0 rounded border-ink-300"
+                  />
+                  <img
+                    src={p.imageUrl}
+                    alt={p.note}
+                    className="h-12 w-12 shrink-0 rounded-lg object-cover"
+                  />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-blue-600">{p.dNumber}</p>
+                    <p className="truncate text-xs text-ink-600">{p.note}</p>
+                    <p className="truncate text-[11px] text-ink-400">{p.customerName}</p>
+                  </div>
+                </label>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {error && (
+        <p role="alert" className="px-1 text-sm font-medium text-red-600">
+          {error}
+        </p>
+      )}
+
+      <div className="flex gap-2 pb-4">
+        <button
+          onClick={onCancel}
+          className="h-12 flex-1 rounded-xl border border-ink-200 text-sm font-semibold text-ink-700 active:scale-[0.98]"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleSave}
+          disabled={saving || loadingParcels}
+          className="h-12 flex-[2] rounded-xl bg-indigo-600 text-sm font-semibold text-white shadow-card active:scale-[0.98] disabled:opacity-60"
+        >
+          {saving ? "Saving…" : "Update Bill"}
         </button>
       </div>
     </div>

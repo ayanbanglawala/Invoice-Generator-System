@@ -108,6 +108,16 @@ Every bundle you've created lives here as a collapsible row: bill number,
 piece count, and a status badge — **"Awaiting Price"** (amber) or
 **"Priced"** (green). Tap a row to expand and see its items inline.
 
+**Editing a bundle after the fact.**
+Open any dealer bill and you'll see two buttons: **Edit Items** and **Add
+Prices** / **Edit Prices**. Edit Items shows every parcel photo with a
+checkbox — already-included ones are pre-ticked. Tick a newly-arrived
+parcel to add it (3 pieces → 4), untick one to remove it (3 → 2) — the
+removed parcel becomes available for a different dealer bundle again.
+Save, and the bundle regenerates: if you added anything new, it drops back
+to "Awaiting Price" so you can price just the new piece; if you only
+removed something, prices you already entered for the rest are kept as-is.
+
 **Step 3 — pricing, once payment time comes.**
 Open a bundle (via the Dealer tab or straight from its manifest page) and
 tap **Add Prices**. You get one row per piece — D-number, model, and a price

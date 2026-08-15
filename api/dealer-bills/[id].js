@@ -2,6 +2,7 @@ import connectDb from "../_db.js";
 import { applyCors } from "../_cors.js";
 import DealerBill from "../../server/models/DealerBill.js";
 import Parcel from "../../server/models/Parcel.js";
+import { applyDealerBillUpdate } from "../../server/lib/dealerBillUpdate.js";
 
 export default async function handler(req, res) {
   if (applyCors(req, res)) return;
@@ -14,31 +15,17 @@ export default async function handler(req, res) {
     return res.status(200).json(bill);
   }
 
-  // Used to add/edit prices (and optionally qty) per item, then flip status
-  // from "packed" -> "priced" once done.
+  // Handles three things independently (see applyDealerBillUpdate):
+  // adding/removing parcels (`parcelIds`), editing price/qty per item
+  // (`items`), and editing `note`/`billNo`.
   if (req.method === "PUT") {
     try {
-      const { items, note, billNo } = req.body || {};
       const bill = await DealerBill.findById(id);
       if (!bill) return res.status(404).json({ error: "Dealer bill not found." });
 
-      if (Array.isArray(items)) {
-        const priceById = new Map(items.map((it) => [it.parcelId, it]));
-        bill.items = bill.items.map((existing) => {
-          const incoming = priceById.get(String(existing.parcelId));
-          if (!incoming) return existing;
-          return {
-            ...existing.toObject(),
-            price: Number(incoming.price) || 0,
-            qty: Number(incoming.qty) > 0 ? Number(incoming.qty) : 1,
-          };
-        });
-      }
-      if (typeof note === "string") bill.note = note.trim();
-      if (typeof billNo === "string" && billNo.trim()) bill.billNo = billNo.trim();
-      bill.status = "priced";
-
+      await applyDealerBillUpdate(bill, req.body || {});
       await bill.save();
+
       return res.status(200).json(bill);
     } catch (err) {
       console.error(err);

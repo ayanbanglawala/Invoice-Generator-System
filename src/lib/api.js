@@ -116,6 +116,13 @@ export function priceDealerBill(id, payload) {
   });
 }
 
+export function updateDealerBillItems(id, payload) {
+  return request(`/dealer-bills/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function deleteDealerBill(id) {
   return request(`/dealer-bills/${id}`, { method: "DELETE" });
 }

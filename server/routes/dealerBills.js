@@ -1,6 +1,7 @@
 import { Router } from "express";
 import DealerBill from "../models/DealerBill.js";
 import Parcel from "../models/Parcel.js";
+import { applyDealerBillUpdate } from "../lib/dealerBillUpdate.js";
 
 const router = Router();
 
@@ -68,30 +69,16 @@ router.get("/:id", async (req, res) => {
   res.json(bill);
 });
 
-// PUT /api/dealer-bills/:id — add/edit prices, flips status to "priced"
+// PUT /api/dealer-bills/:id — add/remove parcels (parcelIds) and/or edit
+// price/qty per item (items) and/or note/billNo. See applyDealerBillUpdate.
 router.put("/:id", async (req, res) => {
   try {
-    const { items, note, billNo } = req.body;
     const bill = await DealerBill.findById(req.params.id);
     if (!bill) return res.status(404).json({ error: "Dealer bill not found." });
 
-    if (Array.isArray(items)) {
-      const priceById = new Map(items.map((it) => [it.parcelId, it]));
-      bill.items = bill.items.map((existing) => {
-        const incoming = priceById.get(String(existing.parcelId));
-        if (!incoming) return existing;
-        return {
-          ...existing.toObject(),
-          price: Number(incoming.price) || 0,
-          qty: Number(incoming.qty) > 0 ? Number(incoming.qty) : 1,
-        };
-      });
-    }
-    if (typeof note === "string") bill.note = note.trim();
-    if (typeof billNo === "string" && billNo.trim()) bill.billNo = billNo.trim();
-    bill.status = "priced";
-
+    await applyDealerBillUpdate(bill, req.body || {});
     await bill.save();
+
     res.json(bill);
   } catch (err) {
     console.error(err);
