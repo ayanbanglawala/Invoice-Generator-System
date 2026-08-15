@@ -7,6 +7,7 @@ import {
   SearchIcon,
   ChevronRightIcon,
   ReceiptIcon,
+  SettingsIcon,
 } from "../components/Icons";
 
 function formatDate(iso) {
@@ -70,13 +71,22 @@ export default function Dashboard() {
             <p className="text-sm text-ink-500">Welcome back</p>
             <h1 className="text-xl font-bold text-ink-900">All Bills</h1>
           </div>
-          <button
-            onClick={signOut}
-            aria-label="Log out"
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-ink-50 text-ink-500 transition-colors active:bg-ink-100"
-          >
-            <LogoutIcon width={20} height={20} />
-          </button>
+          <div className="flex items-center gap-2">
+            <Link
+              to="/settings"
+              aria-label="Settings"
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-ink-50 text-ink-500 transition-colors active:bg-ink-100"
+            >
+              <SettingsIcon width={20} height={20} />
+            </Link>
+            <button
+              onClick={signOut}
+              aria-label="Log out"
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-ink-50 text-ink-500 transition-colors active:bg-ink-100"
+            >
+              <LogoutIcon width={20} height={20} />
+            </button>
+          </div>
         </div>
 
         <div className="mt-5 grid grid-cols-2 gap-3">

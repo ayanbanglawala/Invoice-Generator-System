@@ -1,21 +1,16 @@
 import { Router } from "express";
 import Parcel from "../models/Parcel.js";
 import { uploadParcelImage } from "../lib/blob.js";
+import { nextDNumber } from "../lib/parcelCounter.js";
 
 const router = Router();
 
-async function nextDNumber() {
-  const all = await Parcel.find({}, { dNumber: 1 }).lean();
-  const max = all.reduce((m, p) => {
-    const n = parseInt(String(p.dNumber || "").replace(/\D/g, ""), 10);
-    return Number.isFinite(n) ? Math.max(m, n) : m;
-  }, 0);
-  return `D${max + 1}`;
-}
-
 // GET /api/parcels
 router.get("/", async (req, res) => {
-  const parcels = await Parcel.find().sort({ createdAt: -1 });
+  const parcels = await Parcel.find()
+    .sort({ createdAt: -1 })
+    .populate("billedBillIds", "billNo")
+    .populate("dealerBillId", "billNo status");
   res.json(parcels);
 });
 

@@ -92,3 +92,30 @@ export function createParcel(payload) {
 export function deleteParcel(id) {
   return request(`/parcels/${id}`, { method: "DELETE" });
 }
+
+// ---------- Dealer Bills (parcel bundles sent to the dealer) ----------
+export function getDealerBills() {
+  return request("/dealer-bills");
+}
+
+export function getDealerBill(id) {
+  return request(`/dealer-bills/${id}`);
+}
+
+export function createDealerBill(payload) {
+  return request("/dealer-bills", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function priceDealerBill(id, payload) {
+  return request(`/dealer-bills/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteDealerBill(id) {
+  return request(`/dealer-bills/${id}`, { method: "DELETE" });
+}

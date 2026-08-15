@@ -159,6 +159,17 @@ export function PackageIcon(props) {
   );
 }
 
+export function TruckIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M2 8h11v8H2z" />
+      <path d="M13 11h4l3 3v2h-7z" />
+      <circle cx="6" cy="18" r="1.6" />
+      <circle cx="16.5" cy="18" r="1.6" />
+    </svg>
+  );
+}
+
 export function CheckIcon(props) {
   return (
     <svg {...base} {...props}>

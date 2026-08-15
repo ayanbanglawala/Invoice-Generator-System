@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import customerRoutes from "./routes/customers.js";
 import billRoutes from "./routes/bills.js";
 import parcelRoutes from "./routes/parcels.js";
+import dealerBillRoutes from "./routes/dealerBills.js";
 
 dotenv.config();
 
@@ -21,6 +22,7 @@ app.get("/api/health", (req, res) => {
 app.use("/api/customers", customerRoutes);
 app.use("/api/bills", billRoutes);
 app.use("/api/parcels", parcelRoutes);
+app.use("/api/dealer-bills", dealerBillRoutes);
 
 const PORT = process.env.PORT || 5000;
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/invoice_manager";

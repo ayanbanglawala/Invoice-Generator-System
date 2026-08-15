@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { HomeIcon, PlusIcon, PackageIcon, UsersIcon, SettingsIcon } from "./Icons";
+import { HomeIcon, PlusIcon, PackageIcon, TruckIcon, UsersIcon } from "./Icons";
 
 const leftTabs = [
   { to: "/", label: "Bills", Icon: HomeIcon, end: true },
@@ -7,8 +7,8 @@ const leftTabs = [
 ];
 
 const rightTabs = [
+  { to: "/dealer-bills", label: "Dealer", Icon: TruckIcon },
   { to: "/customers", label: "Customers", Icon: UsersIcon },
-  { to: "/settings", label: "Settings", Icon: SettingsIcon },
 ];
 
 export default function BottomNav() {

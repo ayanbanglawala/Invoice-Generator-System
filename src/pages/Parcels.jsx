@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import * as store from "../lib/storage";
 import { fileToCompressedDataUrl, dataUrlToFile } from "../lib/image";
 import {
@@ -39,6 +40,7 @@ async function parcelToFile(parcel) {
 }
 
 export default function Parcels() {
+  const navigate = useNavigate();
   const [parcels, setParcels] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -48,6 +50,8 @@ export default function Parcels() {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [sharingSelected, setSharingSelected] = useState(false);
+  const [deletingSelected, setDeletingSelected] = useState(false);
+  const [showDealerModal, setShowDealerModal] = useState(false);
   const [openCustomer, setOpenCustomer] = useState(null);
 
   function loadParcels() {
@@ -89,6 +93,56 @@ export default function Parcels() {
     } catch (err) {
       alert(err.message);
     }
+  }
+
+  async function handleDeleteSelected() {
+    const chosen = Array.from(selectedIds);
+    if (chosen.length === 0) return;
+    if (!confirm(`Delete ${chosen.length} selected photo${chosen.length === 1 ? "" : "s"} permanently?`)) {
+      return;
+    }
+    setDeletingSelected(true);
+    try {
+      await Promise.all(chosen.map((id) => store.deleteParcel(id)));
+      setSelectMode(false);
+      setSelectedIds(new Set());
+      await loadParcels();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setDeletingSelected(false);
+    }
+  }
+
+  function handleOpenDealerModal() {
+    const chosen = parcels.filter((p) => selectedIds.has(p._id));
+    const eligible = chosen.filter((p) => !p.dealerBillId);
+    const skipped = chosen.length - eligible.length;
+    if (eligible.length === 0) {
+      alert("All selected photos are already part of a dealer bundle. Pick different photos.");
+      return;
+    }
+    if (skipped > 0) {
+      alert(
+        `${skipped} selected photo${skipped === 1 ? " is" : "s are"} already in another dealer bundle and will be skipped. Continuing with the other ${eligible.length}.`
+      );
+    }
+    setShowDealerModal(true);
+  }
+
+  async function handleCreateDealerBundle({ billNo, note }) {
+    const eligibleIds = parcels
+      .filter((p) => selectedIds.has(p._id) && !p.dealerBillId)
+      .map((p) => p._id);
+    const dealerBill = await store.createDealerBill({
+      billNo,
+      note,
+      parcelIds: eligibleIds,
+    });
+    setShowDealerModal(false);
+    setSelectMode(false);
+    setSelectedIds(new Set());
+    navigate(`/dealer-bills/${dealerBill._id}`);
   }
 
   async function handleShareOne(parcel) {
@@ -265,15 +319,43 @@ export default function Parcels() {
 
       {selectMode && selectedIds.size > 0 && (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-ink-100 bg-white p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
-          <button
-            onClick={handleShareSelected}
-            disabled={sharingSelected}
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand-500 text-base font-semibold text-white shadow-pop active:scale-[0.98] disabled:opacity-60"
-          >
-            <ShareIcon width={18} height={18} />
-            {sharingSelected ? "Preparing…" : `Share Selected (${selectedIds.size})`}
-          </button>
+          <div className="mx-auto flex max-w-md gap-2">
+            <button
+              onClick={handleShareSelected}
+              disabled={sharingSelected || deletingSelected}
+              className="flex h-12 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl border border-ink-200 bg-white text-xs font-semibold text-ink-700 active:scale-[0.98] disabled:opacity-60"
+            >
+              <ShareIcon width={16} height={16} />
+              {sharingSelected ? "…" : "Share"}
+            </button>
+            <button
+              onClick={handleOpenDealerModal}
+              disabled={sharingSelected || deletingSelected}
+              className="flex h-12 flex-[1.3] flex-col items-center justify-center gap-0.5 rounded-xl bg-indigo-600 text-xs font-semibold text-white shadow-card active:scale-[0.98] disabled:opacity-60"
+            >
+              <PackageIcon width={16} height={16} />
+              Send to Dealer
+            </button>
+            <button
+              onClick={handleDeleteSelected}
+              disabled={sharingSelected || deletingSelected}
+              className="flex h-12 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl border border-red-100 bg-red-50 text-xs font-semibold text-red-600 active:scale-[0.98] disabled:opacity-60"
+            >
+              <TrashIcon width={16} height={16} />
+              {deletingSelected ? "…" : "Delete"}
+            </button>
+          </div>
         </div>
+      )}
+
+      {showDealerModal && (
+        <DealerBundleModal
+          count={
+            parcels.filter((p) => selectedIds.has(p._id) && !p.dealerBillId).length
+          }
+          onClose={() => setShowDealerModal(false)}
+          onConfirm={handleCreateDealerBundle}
+        />
       )}
 
       {showCapture && (
@@ -291,7 +373,8 @@ function ParcelGrid({ parcels, selectMode, selectedIds, onToggleSelect, onShare,
   return (
     <div className="grid grid-cols-2 gap-3">
       {parcels.map((p) => {
-        const isBilled = !!p.billedBillIds?.length;
+        const billedNumbers = (p.billedBillIds || []).map((b) => b.billNo).filter(Boolean);
+        const dealerNumber = p.dealerBillId?.billNo;
         return (
           <div
             key={p._id}
@@ -325,11 +408,18 @@ function ParcelGrid({ parcels, selectMode, selectedIds, onToggleSelect, onShare,
               <span className="absolute left-2 top-2 rounded-full bg-blue-600 px-2 py-0.5 text-xs font-extrabold text-white shadow">
                 {p.dNumber}
               </span>
-              {isBilled && (
-                <span className="absolute bottom-2 left-2 rounded-full bg-green-600 px-2 py-0.5 text-[10px] font-bold text-white shadow">
-                  Billed
-                </span>
-              )}
+              <div className="absolute bottom-2 left-2 flex flex-col items-start gap-1">
+                {billedNumbers.length > 0 && (
+                  <span className="rounded-full bg-green-600 px-2 py-0.5 text-[10px] font-bold text-white shadow">
+                    {billedNumbers.join(", ")}
+                  </span>
+                )}
+                {dealerNumber && (
+                  <span className="rounded-full bg-indigo-600 px-2 py-0.5 text-[10px] font-bold text-white shadow">
+                    {dealerNumber}
+                  </span>
+                )}
+              </div>
             </div>
             <div className="p-2.5">
               <p className="truncate text-[13px] font-semibold text-ink-900">
@@ -366,6 +456,96 @@ function ParcelGrid({ parcels, selectMode, selectedIds, onToggleSelect, onShare,
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function DealerBundleModal({ count, onClose, onConfirm }) {
+  const [billNo, setBillNo] = useState("");
+  const [note, setNote] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!billNo.trim()) {
+      setError("Please enter a bill number (e.g. A:352).");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      await onConfirm({ billNo: billNo.trim(), note: note.trim() });
+    } catch (err) {
+      setError(err.message);
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end bg-black/40 backdrop-blur-sm">
+      <form
+        onSubmit={handleSubmit}
+        className="w-full rounded-t-3xl bg-white p-5 pb-8 shadow-pop"
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-bold text-ink-900">Send to Dealer</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-ink-50 text-ink-500"
+          >
+            <XIcon width={18} height={18} />
+          </button>
+        </div>
+
+        <p className="mb-4 rounded-xl bg-indigo-50 px-3.5 py-2.5 text-sm font-medium text-indigo-800">
+          {count} photo{count === 1 ? "" : "s"} selected — will be bundled together.
+        </p>
+
+        <div className="space-y-4">
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-ink-700">
+              Bill Number
+            </label>
+            <input
+              autoFocus
+              value={billNo}
+              onChange={(e) => setBillNo(e.target.value)}
+              placeholder="e.g. A:352"
+              className="h-12 w-full rounded-xl border border-ink-200 px-4 text-base outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+              required
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-ink-700">
+              Description (optional)
+            </label>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={2}
+              placeholder="Any note for this batch"
+              className="w-full rounded-xl border border-ink-200 px-4 py-3 text-base outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+            />
+          </div>
+
+          {error && (
+            <p role="alert" className="text-sm font-medium text-red-600">
+              {error}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={saving}
+            className="h-12 w-full rounded-xl bg-indigo-600 text-base font-semibold text-white shadow-card active:scale-[0.98] disabled:opacity-60"
+          >
+            {saving ? "Creating…" : "Create & Generate Manifest"}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

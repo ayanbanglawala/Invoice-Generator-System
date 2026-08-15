@@ -8,13 +8,17 @@ import CreateBill from "./pages/CreateBill";
 import BillView from "./pages/BillView";
 import Customers from "./pages/Customers";
 import Parcels from "./pages/Parcels";
+import DealerBills from "./pages/DealerBills";
+import DealerBillView from "./pages/DealerBillView";
 import Settings from "./pages/Settings";
 
 function Shell() {
   const { loggedIn } = useAuth();
   const location = useLocation();
   const hasOwnActionBar =
-    location.pathname === "/bills/new" || /^\/bills\/[^/]+$/.test(location.pathname);
+    location.pathname === "/bills/new" ||
+    /^\/bills\/[^/]+$/.test(location.pathname) ||
+    /^\/dealer-bills\/[^/]+$/.test(location.pathname);
   const showNav = loggedIn && location.pathname !== "/login" && !hasOwnActionBar;
 
   return (
@@ -58,6 +62,22 @@ function Shell() {
           element={
             <ProtectedRoute>
               <Parcels />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dealer-bills"
+          element={
+            <ProtectedRoute>
+              <DealerBills />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dealer-bills/:id"
+          element={
+            <ProtectedRoute>
+              <DealerBillView />
             </ProtectedRoute>
           }
         />
