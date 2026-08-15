@@ -1,6 +1,12 @@
 import connectDb from "../_db.js";
 import { applyCors } from "../_cors.js";
 import Parcel from "../../server/models/Parcel.js";
+// Populate below needs "Bill" and "DealerBill" registered with Mongoose —
+// importing them (even though unused directly here) makes that happen.
+// eslint-disable-next-line no-unused-vars
+import Bill from "../../server/models/Bill.js";
+// eslint-disable-next-line no-unused-vars
+import DealerBill from "../../server/models/DealerBill.js";
 import { uploadParcelImage } from "../../server/lib/blob.js";
 import { nextDNumber } from "../../server/lib/parcelCounter.js";
 
