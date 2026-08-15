@@ -318,7 +318,7 @@ export default function Parcels() {
       </main>
 
       {selectMode && selectedIds.size > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-ink-100 bg-white p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
+        <div className="fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] z-40 border-t border-ink-100 bg-white p-3 shadow-pop">
           <div className="mx-auto flex max-w-md gap-2">
             <button
               onClick={handleShareSelected}
