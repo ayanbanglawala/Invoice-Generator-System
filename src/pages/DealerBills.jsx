@@ -162,12 +162,20 @@ export default function DealerBills() {
                           {bill.note}
                         </p>
                       )}
-                      <Link
-                        to={`/dealer-bills/${bill._id}`}
-                        className="mt-3 flex h-11 w-full items-center justify-center rounded-xl bg-indigo-600 text-sm font-semibold text-white active:scale-[0.98]"
-                      >
-                        {bill.status === "priced" ? "View / Share Invoice" : "Add Prices"}
-                      </Link>
+                      <div className="mt-3 flex gap-2">
+                        <Link
+                          to={`/dealer-bills/${bill._id}?mode=items`}
+                          className="flex h-11 flex-1 items-center justify-center gap-1.5 rounded-xl border border-indigo-200 bg-white text-sm font-semibold text-indigo-700 active:scale-[0.98]"
+                        >
+                          <PackageIcon width={16} height={16} /> Edit Items
+                        </Link>
+                        <Link
+                          to={`/dealer-bills/${bill._id}`}
+                          className="flex h-11 flex-1 items-center justify-center rounded-xl bg-indigo-600 text-sm font-semibold text-white active:scale-[0.98]"
+                        >
+                          {bill.status === "priced" ? "View / Share" : "Add Prices"}
+                        </Link>
+                      </div>
                     </div>
                   )}
                 </section>

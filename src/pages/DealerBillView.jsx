@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, useSearchParams, Link } from "react-router-dom";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import * as store from "../lib/storage";
 import DealerManifestTemplate from "../components/DealerManifestTemplate";
 import InvoiceTemplate from "../components/InvoiceTemplate";
-import { DownloadIcon, ShareIcon, ChevronRightIcon, TrashIcon, PackageIcon } from "../components/Icons";
+import { DownloadIcon, ShareIcon, ChevronRightIcon, TrashIcon } from "../components/Icons";
 
 export default function DealerBillView() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const business = store.getBusiness();
   const templateRef = useRef(null);
 
@@ -16,7 +17,9 @@ export default function DealerBillView() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [editMode, setEditMode] = useState(null); // null | "prices" | "items"
+  const [editMode, setEditMode] = useState(
+    searchParams.get("mode") === "items" ? "items" : null
+  ); // null | "prices" | "items"
 
   function load() {
     setLoading(true);
@@ -235,20 +238,12 @@ export default function DealerBillView() {
               )}
             </div>
 
-            <div className="mt-4 flex gap-2">
-              <button
-                onClick={() => setEditMode("items")}
-                className="flex h-11 flex-1 items-center justify-center gap-1.5 rounded-xl border border-indigo-200 bg-white text-sm font-semibold text-indigo-700 active:scale-[0.98]"
-              >
-                <PackageIcon width={16} height={16} /> Edit Items
-              </button>
-              <button
-                onClick={() => setEditMode("prices")}
-                className="flex h-11 flex-1 items-center justify-center rounded-xl border border-indigo-200 bg-indigo-50 text-sm font-semibold text-indigo-700 active:scale-[0.98]"
-              >
-                {bill.status === "priced" ? "Edit Prices" : "Add Prices"}
-              </button>
-            </div>
+            <button
+              onClick={() => setEditMode("prices")}
+              className="mt-4 flex h-11 w-full items-center justify-center rounded-xl border border-indigo-200 bg-indigo-50 text-sm font-semibold text-indigo-700 active:scale-[0.98]"
+            >
+              {bill.status === "priced" ? "Edit Prices" : "Add Prices"}
+            </button>
           </>
         )}
       </main>
@@ -410,6 +405,8 @@ function ItemsEditForm({ bill, onCancel, onSaved }) {
   const [selectedIds, setSelectedIds] = useState(
     new Set(bill.items.map((it) => String(it.parcelId)))
   );
+  const [billNo, setBillNo] = useState(bill.billNo);
+  const [note, setNote] = useState(bill.note || "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -448,6 +445,8 @@ function ItemsEditForm({ bill, onCancel, onSaved }) {
     try {
       const updated = await store.updateDealerBillItems(bill._id, {
         parcelIds: Array.from(selectedIds),
+        billNo,
+        note,
       });
       onSaved(updated);
     } catch (err) {
@@ -462,6 +461,27 @@ function ItemsEditForm({ bill, onCancel, onSaved }) {
       <div className="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-3.5 text-sm font-medium text-indigo-800">
         {selectedIds.size} piece{selectedIds.size === 1 ? "" : "s"} selected for{" "}
         <span className="font-bold">{bill.billNo}</span>. Tick to add, untick to remove.
+      </div>
+
+      <div className="rounded-2xl border border-ink-100 bg-white p-4 shadow-card">
+        <label className="mb-1.5 block text-sm font-semibold text-ink-700">
+          Bill Number
+        </label>
+        <input
+          value={billNo}
+          onChange={(e) => setBillNo(e.target.value)}
+          className="h-12 w-full rounded-xl border border-ink-200 px-4 text-base outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+        />
+        <label className="mb-1.5 mt-4 block text-sm font-semibold text-ink-700">
+          Description (optional)
+        </label>
+        <textarea
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          rows={2}
+          placeholder="Any note for this batch"
+          className="w-full rounded-xl border border-ink-200 px-4 py-3 text-base outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+        />
       </div>
 
       <div className="rounded-2xl border border-ink-100 bg-white p-4 shadow-card">
