@@ -24,7 +24,7 @@ function parcelStatus(p) {
   return parts.length ? parts.join(" + ") : "Pending";
 }
 
-function sheetFromRows(rows, colWidths) {
+function sheetFromRows(XLSX, rows, colWidths) {
   const ws = XLSX.utils.json_to_sheet(rows);
   if (colWidths) ws["!cols"] = colWidths.map((wch) => ({ wch }));
   return ws;
@@ -37,7 +37,8 @@ function sheetFromRows(rows, colWidths) {
  * a Summary sheet with totals for the range. All within [from, to].
  */
 export async function downloadReportExcel({ parcels, bills, dealerBills }, { from, to } = {}) {
-  const XLSX = await import("xlsx");
+  const mod = await import("xlsx");
+  const XLSX = mod.utils ? mod : mod.default;
   const wb = XLSX.utils.book_new();
 
   // ---- Summary ----
@@ -64,7 +65,7 @@ export async function downloadReportExcel({ parcels, bills, dealerBills }, { fro
     { Metric: "Dealer Pieces Sent Out", Value: dealerPiecesOut },
     { Metric: "Dealer Revenue (Priced Bundles Only)", Value: dealerRevenue },
   ];
-  XLSX.utils.book_append_sheet(wb, sheetFromRows(summaryRows, [32, 22]), "Summary");
+  XLSX.utils.book_append_sheet(wb, sheetFromRows(XLSX, summaryRows, [32, 22]), "Summary");
 
   // ---- Parcels: every phone that came in, and where it went ----
   const parcelRows = parcels.map((p) => ({
@@ -79,7 +80,7 @@ export async function downloadReportExcel({ parcels, bills, dealerBills }, { fro
   }));
   XLSX.utils.book_append_sheet(
     wb,
-    sheetFromRows(parcelRows, [8, 14, 20, 14, 24, 18, 14, 22]),
+    sheetFromRows(XLSX, parcelRows, [8, 14, 20, 14, 24, 18, 14, 22]),
     "Parcels"
   );
 
@@ -102,7 +103,7 @@ export async function downloadReportExcel({ parcels, bills, dealerBills }, { fro
   }
   XLSX.utils.book_append_sheet(
     wb,
-    sheetFromRows(billRows, [14, 12, 20, 8, 22, 6, 10, 12, 12]),
+    sheetFromRows(XLSX, billRows, [14, 12, 20, 8, 22, 6, 10, 12, 12]),
     "Customer Bills"
   );
 
@@ -126,7 +127,7 @@ export async function downloadReportExcel({ parcels, bills, dealerBills }, { fro
   }
   XLSX.utils.book_append_sheet(
     wb,
-    sheetFromRows(dealerRows, [14, 12, 14, 8, 22, 6, 10, 12, 12, 24]),
+    sheetFromRows(XLSX, dealerRows, [14, 12, 14, 8, 22, 6, 10, 12, 12, 24]),
     "Dealer Bills"
   );
 
