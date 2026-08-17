@@ -178,7 +178,32 @@ Both the Express server (`server/`) and the Vercel serverless functions
 `BLOB_READ_WRITE_TOKEN` is set in your local `.env` too, or photo uploads
 will fail locally even though everything else works.
 
-## 5. Known limitations / honest caveats
+## 5. Excel export (Settings tab)
+
+Settings has an **Export Data** section: pick a date range (or use the
+This Month / Last 30 Days / Last 90 Days / All Time shortcuts) and tap
+**Download Excel Report**. It pulls from `GET /api/reports` and generates a
+`.xlsx` file client-side (via the `xlsx` package, lazy-loaded only when you
+actually export, so it doesn't bloat the app's normal load time) with four
+sheets:
+
+- **Summary** — totals for the range: parcels received, how many are still
+  pending, customer bills created + total revenue, dealer bundles created +
+  pieces sent out + revenue from priced bundles.
+- **Parcels** — every phone that came in during the range: D-number, date,
+  customer, phone number, model/variant, and where it ended up — customer
+  bill number(s), dealer bundle number, both, or "Pending" if neither yet.
+- **Customer Bills** — one row per line item across every bill in the
+  range (bill number, date, customer, D-number, model, qty, price, line
+  total, bill total).
+- **Dealer Bills** — the same idea for dealer bundles: one row per piece,
+  including whether that bundle is still "Awaiting Price" or "Priced".
+
+This is meant to be the single reference for "what happened to this phone,
+and when" — everything in one file, sortable/filterable in Excel itself,
+for whenever you need to trace back a problem.
+
+## 6. Known limitations / honest caveats
 
 - **Multi-image share** depends on the browser supporting `navigator.share`
   with multiple files. iOS Safari (17+) and recent Chrome/Android generally

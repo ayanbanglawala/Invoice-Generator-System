@@ -6,6 +6,7 @@ import customerRoutes from "./routes/customers.js";
 import billRoutes from "./routes/bills.js";
 import parcelRoutes from "./routes/parcels.js";
 import dealerBillRoutes from "./routes/dealerBills.js";
+import reportRoutes from "./routes/reports.js";
 
 dotenv.config();
 
@@ -23,6 +24,7 @@ app.use("/api/customers", customerRoutes);
 app.use("/api/bills", billRoutes);
 app.use("/api/parcels", parcelRoutes);
 app.use("/api/dealer-bills", dealerBillRoutes);
+app.use("/api/reports", reportRoutes);
 
 const PORT = process.env.PORT || 5000;
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/invoice_manager";

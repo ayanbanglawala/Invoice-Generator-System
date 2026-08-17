@@ -126,3 +126,12 @@ export function updateDealerBillItems(id, payload) {
 export function deleteDealerBill(id) {
   return request(`/dealer-bills/${id}`, { method: "DELETE" });
 }
+
+// ---------- Reports (date-range export) ----------
+export function getReport({ from, to } = {}) {
+  const params = new URLSearchParams();
+  if (from) params.set("from", from);
+  if (to) params.set("to", to);
+  const qs = params.toString();
+  return request(`/reports${qs ? `?${qs}` : ""}`);
+}
