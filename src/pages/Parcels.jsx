@@ -211,11 +211,11 @@ export default function Parcels() {
   );
 
   return (
-    <div className="min-h-dvh bg-ink-50 pb-28">
-      <header className="flex items-center justify-between bg-white px-5 pb-4 pt-6 shadow-card">
+    <div className="min-h-dvh bg-ink-50 dark:bg-ink-950 pb-28">
+      <header className="flex items-center justify-between bg-white dark:bg-ink-900 px-5 pb-4 pt-6 shadow-card">
         <div>
-          <h1 className="text-xl font-bold text-ink-900">Parcels</h1>
-          <p className="mt-0.5 text-sm text-ink-500">
+          <h1 className="text-xl font-bold text-ink-900 dark:text-white">Parcels</h1>
+          <p className="mt-0.5 text-sm text-ink-500 dark:text-ink-400">
             {pendingCount} pending · {billedCount} billed
           </p>
         </div>
@@ -223,7 +223,7 @@ export default function Parcels() {
           <button
             onClick={toggleSelectMode}
             className={`h-10 rounded-full px-3.5 text-sm font-semibold transition-colors ${
-              selectMode ? "bg-ink-900 text-white" : "bg-ink-50 text-ink-600"
+              selectMode ? "bg-ink-900 text-white" : "bg-ink-50 dark:bg-ink-950 text-ink-600 dark:text-ink-300"
             }`}
           >
             {selectMode ? "Cancel" : "Select"}
@@ -239,7 +239,7 @@ export default function Parcels() {
 
       <main className="px-5 pt-4">
         {error && (
-          <div className="mb-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="mb-3 rounded-xl border border-red-100 dark:border-red-900 bg-red-50 dark:bg-red-950 px-4 py-3 text-sm text-red-700 dark:text-red-300">
             Could not load parcels: {error}
           </div>
         )}
@@ -247,18 +247,18 @@ export default function Parcels() {
         {loading ? (
           <div className="grid grid-cols-2 gap-3">
             {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="h-40 animate-pulse rounded-2xl bg-white shadow-card" />
+              <div key={i} className="h-40 animate-pulse rounded-2xl bg-white dark:bg-ink-900 shadow-card" />
             ))}
           </div>
         ) : parcels.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-ink-200 bg-white px-6 py-14 text-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-50 text-brand-500">
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-ink-200 dark:border-ink-700 bg-white dark:bg-ink-900 px-6 py-14 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-50 dark:bg-brand-950 text-brand-500">
               <PackageIcon width={26} height={26} />
             </div>
-            <p className="mt-4 text-[15px] font-semibold text-ink-800">
+            <p className="mt-4 text-[15px] font-semibold text-ink-800 dark:text-ink-100">
               No parcels yet
             </p>
-            <p className="mt-1 max-w-[220px] text-sm text-ink-500">
+            <p className="mt-1 max-w-[220px] text-sm text-ink-500 dark:text-ink-400">
               Tap "Photo" to snap a parcel and tag it to a customer.
             </p>
           </div>
@@ -270,21 +270,21 @@ export default function Parcels() {
               return (
                 <section
                   key={group.key}
-                  className="overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-card"
+                  className="overflow-hidden rounded-2xl border border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 shadow-card"
                 >
                   <button
                     onClick={() => setOpenCustomer(isOpen && !selectMode ? null : group.key)}
                     className="flex w-full items-center justify-between px-4 py-3.5"
                   >
                     <div className="flex items-center gap-2">
-                      <span className="text-[15px] font-bold text-ink-900">
+                      <span className="text-[15px] font-bold text-ink-900 dark:text-white">
                         {group.customerName}
                       </span>
-                      <span className="rounded-full bg-ink-50 px-2 py-0.5 text-xs font-semibold text-ink-500">
+                      <span className="rounded-full bg-ink-50 dark:bg-ink-950 px-2 py-0.5 text-xs font-semibold text-ink-500 dark:text-ink-400">
                         {group.parcels.length}
                       </span>
                       {groupPending > 0 && (
-                        <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                        <span className="rounded-full bg-amber-50 dark:bg-amber-950 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-300">
                           {groupPending} pending
                         </span>
                       )}
@@ -299,7 +299,7 @@ export default function Parcels() {
                   </button>
 
                   {isOpen && (
-                    <div className="border-t border-ink-100 p-3">
+                    <div className="border-t border-ink-100 dark:border-ink-800 p-3">
                       <ParcelGrid
                         parcels={group.parcels}
                         selectMode={selectMode}
@@ -318,12 +318,12 @@ export default function Parcels() {
       </main>
 
       {selectMode && selectedIds.size > 0 && (
-        <div className="fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] z-40 border-t border-ink-100 bg-white p-3 shadow-pop">
+        <div className="fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] z-40 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 p-3 shadow-pop">
           <div className="mx-auto flex max-w-md gap-2">
             <button
               onClick={handleShareSelected}
               disabled={sharingSelected || deletingSelected}
-              className="flex h-12 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl border border-ink-200 bg-white text-xs font-semibold text-ink-700 active:scale-[0.98] disabled:opacity-60"
+              className="flex h-12 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl border border-ink-200 dark:border-ink-700 bg-white dark:bg-ink-900 text-xs font-semibold text-ink-700 dark:text-ink-200 active:scale-[0.98] disabled:opacity-60"
             >
               <ShareIcon width={16} height={16} />
               {sharingSelected ? "…" : "Share"}
@@ -339,7 +339,7 @@ export default function Parcels() {
             <button
               onClick={handleDeleteSelected}
               disabled={sharingSelected || deletingSelected}
-              className="flex h-12 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl border border-red-100 bg-red-50 text-xs font-semibold text-red-600 active:scale-[0.98] disabled:opacity-60"
+              className="flex h-12 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl border border-red-100 dark:border-red-900 bg-red-50 dark:bg-red-950 text-xs font-semibold text-red-600 dark:text-red-400 active:scale-[0.98] disabled:opacity-60"
             >
               <TrashIcon width={16} height={16} />
               {deletingSelected ? "…" : "Delete"}
@@ -379,15 +379,15 @@ function ParcelGrid({ parcels, selectMode, selectedIds, onToggleSelect, onShare,
           <div
             key={p._id}
             onClick={() => selectMode && onToggleSelect(p._id)}
-            className={`overflow-hidden rounded-2xl border bg-white shadow-card ${
+            className={`overflow-hidden rounded-2xl border bg-white dark:bg-ink-900 shadow-card ${
               selectMode ? "cursor-pointer" : ""
             } ${
               selectMode && selectedIds.has(p._id)
                 ? "border-brand-400 ring-2 ring-brand-200"
-                : "border-ink-100"
+                : "border-ink-100 dark:border-ink-800"
             }`}
           >
-            <div className="relative aspect-square w-full bg-ink-50">
+            <div className="relative aspect-square w-full bg-ink-50 dark:bg-ink-950">
               <img
                 src={p.imageUrl}
                 alt={p.note}
@@ -422,11 +422,11 @@ function ParcelGrid({ parcels, selectMode, selectedIds, onToggleSelect, onShare,
               </div>
             </div>
             <div className="p-2.5">
-              <p className="truncate text-[13px] font-semibold text-ink-900">
+              <p className="truncate text-[13px] font-semibold text-ink-900 dark:text-white">
                 {p.customerName}
               </p>
-              <p className="truncate text-xs text-ink-500">{p.note}</p>
-              <p className="mt-0.5 text-[10px] text-ink-400">
+              <p className="truncate text-xs text-ink-500 dark:text-ink-400">{p.note}</p>
+              <p className="mt-0.5 text-[10px] text-ink-400 dark:text-ink-500">
                 {formatDateTime(p.createdAt)}
               </p>
               {!selectMode && (
@@ -436,7 +436,7 @@ function ParcelGrid({ parcels, selectMode, selectedIds, onToggleSelect, onShare,
                       e.stopPropagation();
                       onShare(p);
                     }}
-                    className="flex h-8 flex-1 items-center justify-center gap-1 rounded-lg bg-brand-50 text-xs font-semibold text-brand-700 active:scale-95"
+                    className="flex h-8 flex-1 items-center justify-center gap-1 rounded-lg bg-brand-50 dark:bg-brand-950 text-xs font-semibold text-brand-700 dark:text-brand-300 active:scale-95"
                   >
                     <ShareIcon width={13} height={13} /> Share
                   </button>
@@ -446,7 +446,7 @@ function ParcelGrid({ parcels, selectMode, selectedIds, onToggleSelect, onShare,
                       onDelete(p._id);
                     }}
                     aria-label="Delete parcel"
-                    className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-400 active:bg-red-50 active:text-red-600"
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-400 dark:text-ink-500 active:bg-red-50 dark:bg-red-950 active:text-red-600 dark:text-red-400"
                   >
                     <TrashIcon width={14} height={14} />
                   </button>
@@ -486,27 +486,27 @@ function DealerBundleModal({ count, onClose, onConfirm }) {
     <div className="fixed inset-0 z-50 flex items-end bg-black/40 backdrop-blur-sm">
       <form
         onSubmit={handleSubmit}
-        className="w-full rounded-t-3xl bg-white p-5 pb-8 shadow-pop"
+        className="w-full rounded-t-3xl bg-white dark:bg-ink-900 p-5 pb-8 shadow-pop"
       >
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-ink-900">Send to Dealer</h2>
+          <h2 className="text-lg font-bold text-ink-900 dark:text-white">Send to Dealer</h2>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-ink-50 text-ink-500"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-ink-50 dark:bg-ink-950 text-ink-500 dark:text-ink-400"
           >
             <XIcon width={18} height={18} />
           </button>
         </div>
 
-        <p className="mb-4 rounded-xl bg-indigo-50 px-3.5 py-2.5 text-sm font-medium text-indigo-800">
+        <p className="mb-4 rounded-xl bg-indigo-50 dark:bg-indigo-950 px-3.5 py-2.5 text-sm font-medium text-indigo-800 dark:text-indigo-200">
           {count} photo{count === 1 ? "" : "s"} selected — will be bundled together.
         </p>
 
         <div className="space-y-4">
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-ink-700">
+            <label className="mb-1.5 block text-sm font-medium text-ink-700 dark:text-ink-200">
               Bill Number
             </label>
             <input
@@ -514,12 +514,12 @@ function DealerBundleModal({ count, onClose, onConfirm }) {
               value={billNo}
               onChange={(e) => setBillNo(e.target.value)}
               placeholder="e.g. A:352"
-              className="h-12 w-full rounded-xl border border-ink-200 px-4 text-base outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+              className="h-12 w-full rounded-xl border border-ink-200 dark:border-ink-700 px-4 text-base outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
               required
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-ink-700">
+            <label className="mb-1.5 block text-sm font-medium text-ink-700 dark:text-ink-200">
               Description (optional)
             </label>
             <textarea
@@ -527,12 +527,12 @@ function DealerBundleModal({ count, onClose, onConfirm }) {
               onChange={(e) => setNote(e.target.value)}
               rows={2}
               placeholder="Any note for this batch"
-              className="w-full rounded-xl border border-ink-200 px-4 py-3 text-base outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+              className="w-full rounded-xl border border-ink-200 dark:border-ink-700 px-4 py-3 text-base outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
             />
           </div>
 
           {error && (
-            <p role="alert" className="text-sm font-medium text-red-600">
+            <p role="alert" className="text-sm font-medium text-red-600 dark:text-red-400">
               {error}
             </p>
           )}
@@ -639,15 +639,15 @@ function CaptureSheet({ customers, onClose, onSaved }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end bg-black/40 backdrop-blur-sm">
-      <div className="max-h-[92dvh] w-full overflow-y-auto rounded-t-3xl bg-white p-5 pb-8 shadow-pop">
+      <div className="max-h-[92dvh] w-full overflow-y-auto rounded-t-3xl bg-white dark:bg-ink-900 p-5 pb-8 shadow-pop">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-ink-900">
+          <h2 className="text-lg font-bold text-ink-900 dark:text-white">
             {saved ? "Saved" : "New Parcel Photo"}
           </h2>
           <button
             onClick={onClose}
             aria-label="Close"
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-ink-50 text-ink-500"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-ink-50 dark:bg-ink-950 text-ink-500 dark:text-ink-400"
           >
             <XIcon width={18} height={18} />
           </button>
@@ -655,13 +655,13 @@ function CaptureSheet({ customers, onClose, onSaved }) {
 
         {saved ? (
           <div className="flex flex-col items-center text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-50 text-green-600">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-50 dark:bg-green-950 text-green-600 dark:text-green-400">
               <CheckCircleIcon width={32} height={32} />
             </div>
-            <p className="mt-3 text-2xl font-extrabold text-blue-600">
+            <p className="mt-3 text-2xl font-extrabold text-blue-600 dark:text-blue-400">
               {saved.parcel.dNumber}
             </p>
-            <p className="mt-1 text-sm text-ink-600">
+            <p className="mt-1 text-sm text-ink-600 dark:text-ink-300">
               {saved.parcel.customerName} · {saved.parcel.note}
             </p>
 
@@ -674,13 +674,13 @@ function CaptureSheet({ customers, onClose, onSaved }) {
               </button>
               <button
                 onClick={handleAddAnother}
-                className="flex h-12 w-full items-center justify-center rounded-xl border border-ink-200 text-base font-semibold text-ink-700 active:scale-[0.98]"
+                className="flex h-12 w-full items-center justify-center rounded-xl border border-ink-200 dark:border-ink-700 text-base font-semibold text-ink-700 dark:text-ink-200 active:scale-[0.98]"
               >
                 Add Another Photo
               </button>
               <button
                 onClick={onClose}
-                className="flex h-11 w-full items-center justify-center text-sm font-semibold text-ink-400"
+                className="flex h-11 w-full items-center justify-center text-sm font-semibold text-ink-400 dark:text-ink-500"
               >
                 Done
               </button>
@@ -704,7 +704,7 @@ function CaptureSheet({ customers, onClose, onSaved }) {
               className="hidden"
             />
             {dataUrl ? (
-              <div className="relative overflow-hidden rounded-2xl border border-ink-100">
+              <div className="relative overflow-hidden rounded-2xl border border-ink-100 dark:border-ink-800">
                 <img src={dataUrl} alt="Parcel preview" className="max-h-64 w-full object-cover" />
                 <div className="absolute bottom-2 right-2 flex gap-1.5">
                   <button
@@ -725,14 +725,14 @@ function CaptureSheet({ customers, onClose, onSaved }) {
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={() => cameraInputRef.current?.click()}
-                  className="flex h-32 flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-ink-200 bg-ink-50 text-ink-400"
+                  className="flex h-32 flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-ink-200 dark:border-ink-700 bg-ink-50 dark:bg-ink-950 text-ink-400 dark:text-ink-500"
                 >
                   <CameraIcon width={28} height={28} />
                   <span className="text-xs font-medium">Take Photo</span>
                 </button>
                 <button
                   onClick={() => galleryInputRef.current?.click()}
-                  className="flex h-32 flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-ink-200 bg-ink-50 text-ink-400"
+                  className="flex h-32 flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-ink-200 dark:border-ink-700 bg-ink-50 dark:bg-ink-950 text-ink-400 dark:text-ink-500"
                 >
                   <ImageUploadIcon width={28} height={28} />
                   <span className="text-xs font-medium">Upload Image</span>
@@ -741,13 +741,13 @@ function CaptureSheet({ customers, onClose, onSaved }) {
             )}
 
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-ink-700">
+              <label className="mb-1.5 block text-sm font-medium text-ink-700 dark:text-ink-200">
                 Customer
               </label>
               <select
                 value={customerId}
                 onChange={(e) => handleSelectCustomer(e.target.value)}
-                className="h-12 w-full rounded-xl border border-ink-200 bg-white px-4 text-base outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+                className="h-12 w-full rounded-xl border border-ink-200 dark:border-ink-700 bg-white dark:bg-ink-900 px-4 text-base outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
               >
                 <option value="">Select a customer…</option>
                 {customers.map((c) => (
@@ -758,26 +758,26 @@ function CaptureSheet({ customers, onClose, onSaved }) {
                 ))}
               </select>
               {customers.length === 0 && (
-                <p className="mt-1.5 text-xs text-ink-400">
+                <p className="mt-1.5 text-xs text-ink-400 dark:text-ink-500">
                   No customers yet — add one from the Customers tab first.
                 </p>
               )}
             </div>
 
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-ink-700">
+              <label className="mb-1.5 block text-sm font-medium text-ink-700 dark:text-ink-200">
                 Note (phone model / variant)
               </label>
               <input
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="e.g. iPhone 17 256"
-                className="h-12 w-full rounded-xl border border-ink-200 px-4 text-base outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+                className="h-12 w-full rounded-xl border border-ink-200 dark:border-ink-700 px-4 text-base outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
               />
             </div>
 
             {error && (
-              <p role="alert" className="text-sm font-medium text-red-600">
+              <p role="alert" className="text-sm font-medium text-red-600 dark:text-red-400">
                 {error}
               </p>
             )}

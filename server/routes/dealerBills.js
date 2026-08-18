@@ -88,7 +88,7 @@ router.put("/:id", async (req, res) => {
 
 // DELETE /api/dealer-bills/:id
 router.delete("/:id", async (req, res) => {
-  await Parcel.updateMany({ dealerBillId: req.params.id }, { $set: { dealerBillId: null } });
+  await Parcel.updateMany({ dealerBillId: req.params.id }, { $set: { dealerBillId: null, dealerPrice: null } });
   await DealerBill.findByIdAndDelete(req.params.id);
   res.status(204).end();
 });

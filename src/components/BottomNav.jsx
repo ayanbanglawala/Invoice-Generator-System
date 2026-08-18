@@ -13,7 +13,7 @@ const rightTabs = [
 
 export default function BottomNav() {
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-ink-100 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
+    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-ink-100 dark:border-ink-800 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
       <div className="mx-auto flex max-w-md items-stretch justify-between px-1">
         {leftTabs.map((t) => (
           <TabLink key={t.to} {...t} />
@@ -26,7 +26,7 @@ export default function BottomNav() {
           <span className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-500 text-white shadow-pop transition-transform active:scale-95">
             <PlusIcon width={26} height={26} />
           </span>
-          <span className="mt-1 text-[11px] font-medium text-ink-500">
+          <span className="mt-1 text-[11px] font-medium text-ink-500 dark:text-ink-400">
             New Bill
           </span>
         </NavLink>
@@ -46,7 +46,7 @@ function TabLink({ to, label, Icon, end }) {
       end={end}
       className={({ isActive }) =>
         `flex min-w-[56px] flex-1 flex-col items-center justify-center gap-1 py-2.5 text-[10px] font-medium transition-colors ${
-          isActive ? "text-brand-600" : "text-ink-400"
+          isActive ? "text-brand-600" : "text-ink-400 dark:text-ink-500"
         }`
       }
     >

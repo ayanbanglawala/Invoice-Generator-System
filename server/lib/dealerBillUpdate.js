@@ -60,7 +60,7 @@ export async function applyDealerBillUpdate(bill, payload) {
     if (toRemove.length > 0) {
       await Parcel.updateMany(
         { _id: { $in: toRemove } },
-        { $set: { dealerBillId: null } }
+        { $set: { dealerBillId: null, dealerPrice: null } }
       );
     }
   }
@@ -81,6 +81,22 @@ export async function applyDealerBillUpdate(bill, payload) {
 
   if (bill.items.length === 0) {
     throw new Error("A dealer bill needs at least one piece — add one before saving, or delete the bill instead.");
+  }
+
+  // Keep each parcel's denormalized dealerPrice in sync with this bill's
+  // current item prices (covers both the `items` price-edit path and the
+  // `parcelIds` composition-edit path, since either can change what a
+  // parcel's price should read).
+  const pricedUpdates = bill.items
+    .filter((it) => Number(it.price) > 0)
+    .map((it) => ({
+      updateOne: {
+        filter: { _id: it.parcelId },
+        update: { $set: { dealerPrice: Number(it.price) } },
+      },
+    }));
+  if (pricedUpdates.length > 0) {
+    await Parcel.bulkWrite(pricedUpdates);
   }
 
   if (typeof note === "string") bill.note = note.trim();

@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { ThemeProvider } from "./context/ThemeContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import BottomNav from "./components/BottomNav";
 import Login from "./pages/Login";
@@ -7,6 +8,7 @@ import Dashboard from "./pages/Dashboard";
 import CreateBill from "./pages/CreateBill";
 import BillView from "./pages/BillView";
 import Customers from "./pages/Customers";
+import CustomerLedger from "./pages/CustomerLedger";
 import Parcels from "./pages/Parcels";
 import DealerBills from "./pages/DealerBills";
 import DealerBillView from "./pages/DealerBillView";
@@ -58,6 +60,14 @@ function Shell() {
           }
         />
         <Route
+          path="/customers/:id"
+          element={
+            <ProtectedRoute>
+              <CustomerLedger />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/parcels"
           element={
             <ProtectedRoute>
@@ -99,9 +109,11 @@ function Shell() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <Shell />
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <Shell />
+        </AuthProvider>
+      </ThemeProvider>
     </BrowserRouter>
   );
 }

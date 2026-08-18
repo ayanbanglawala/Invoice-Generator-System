@@ -40,19 +40,19 @@ export default function DealerBillView() {
 
   if (loading) {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-ink-50">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-500" />
+      <div className="flex min-h-dvh items-center justify-center bg-ink-50 dark:bg-ink-950">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-indigo-200 dark:border-indigo-800 border-t-indigo-500" />
       </div>
     );
   }
 
   if (loadError || !bill) {
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-ink-50 px-6 text-center">
-        <p className="text-base font-semibold text-ink-800">
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-ink-50 dark:bg-ink-950 px-6 text-center">
+        <p className="text-base font-semibold text-ink-800 dark:text-ink-100">
           {loadError ? "Could not load this dealer bill" : "Dealer bill not found"}
         </p>
-        {loadError && <p className="text-sm text-ink-500">{loadError}</p>}
+        {loadError && <p className="text-sm text-ink-500 dark:text-ink-400">{loadError}</p>}
         <Link
           to="/dealer-bills"
           className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white"
@@ -182,19 +182,19 @@ export default function DealerBillView() {
   };
 
   return (
-    <div className="min-h-dvh bg-ink-50 pb-32">
-      <header className="bg-white px-5 pb-4 pt-6 shadow-card">
-        <div className="flex items-center gap-1 text-sm text-ink-400">
-          <Link to="/dealer-bills" className="hover:text-ink-600">
+    <div className="min-h-dvh bg-ink-50 dark:bg-ink-950 pb-32">
+      <header className="bg-white dark:bg-ink-900 px-5 pb-4 pt-6 shadow-card">
+        <div className="flex items-center gap-1 text-sm text-ink-400 dark:text-ink-500">
+          <Link to="/dealer-bills" className="hover:text-ink-600 dark:text-ink-300">
             Dealer Bills
           </Link>
           <ChevronRightIcon width={14} height={14} />
-          <span className="text-ink-600">{bill.billNo}</span>
+          <span className="text-ink-600 dark:text-ink-300">{bill.billNo}</span>
         </div>
         <div className="mt-2 flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-indigo-600">{bill.billNo}</h1>
-            <p className="mt-0.5 text-sm text-ink-500">
+            <p className="mt-0.5 text-sm text-ink-500 dark:text-ink-400">
               {bill.totalPieces} pieces ·{" "}
               {bill.status === "priced" ? "Priced" : "Awaiting price"}
             </p>
@@ -202,7 +202,7 @@ export default function DealerBillView() {
           <button
             onClick={handleDelete}
             aria-label="Delete dealer bill"
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-ink-50 text-ink-400 transition-colors active:bg-red-50 active:text-red-600"
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-ink-50 dark:bg-ink-950 text-ink-400 dark:text-ink-500 transition-colors active:bg-red-50 dark:bg-red-950 active:text-red-600 dark:text-red-400"
           >
             <TrashIcon width={19} height={19} />
           </button>
@@ -240,7 +240,7 @@ export default function DealerBillView() {
 
             <button
               onClick={() => setEditMode("prices")}
-              className="mt-4 flex h-11 w-full items-center justify-center rounded-xl border border-indigo-200 bg-indigo-50 text-sm font-semibold text-indigo-700 active:scale-[0.98]"
+              className="mt-4 flex h-11 w-full items-center justify-center rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950 text-sm font-semibold text-indigo-700 dark:text-indigo-300 active:scale-[0.98]"
             >
               {bill.status === "priced" ? "Edit Prices" : "Add Prices"}
             </button>
@@ -249,12 +249,12 @@ export default function DealerBillView() {
       </main>
 
       {!editMode && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-ink-100 bg-white p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
           <div className="mx-auto flex max-w-md gap-2">
             <button
               onClick={handleDownloadJpg}
               disabled={busy}
-              className="flex h-12 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl border border-ink-200 bg-white text-xs font-semibold text-ink-700 active:scale-[0.98] disabled:opacity-60"
+              className="flex h-12 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl border border-ink-200 dark:border-ink-700 bg-white dark:bg-ink-900 text-xs font-semibold text-ink-700 dark:text-ink-200 active:scale-[0.98] disabled:opacity-60"
             >
               <DownloadIcon width={17} height={17} />
               JPG
@@ -262,7 +262,7 @@ export default function DealerBillView() {
             <button
               onClick={handleDownloadPdf}
               disabled={busy}
-              className="flex h-12 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl border border-ink-200 bg-white text-xs font-semibold text-ink-700 active:scale-[0.98] disabled:opacity-60"
+              className="flex h-12 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl border border-ink-200 dark:border-ink-700 bg-white dark:bg-ink-900 text-xs font-semibold text-ink-700 dark:text-ink-200 active:scale-[0.98] disabled:opacity-60"
             >
               <DownloadIcon width={17} height={17} />
               PDF
@@ -316,30 +316,30 @@ function PricingForm({ bill, onCancel, onSaved }) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-ink-100 bg-white p-4 shadow-card">
-        <label className="mb-1.5 block text-sm font-semibold text-ink-700">
+      <div className="rounded-2xl border border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 p-4 shadow-card">
+        <label className="mb-1.5 block text-sm font-semibold text-ink-700 dark:text-ink-200">
           Bill Number
         </label>
         <input
           value={billNo}
           onChange={(e) => setBillNo(e.target.value)}
-          className="h-12 w-full rounded-xl border border-ink-200 px-4 text-base outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+          className="h-12 w-full rounded-xl border border-ink-200 dark:border-ink-700 px-4 text-base outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
         />
       </div>
 
-      <div className="rounded-2xl border border-ink-100 bg-white p-4 shadow-card">
-        <h2 className="mb-3 text-sm font-semibold text-ink-700">
+      <div className="rounded-2xl border border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 p-4 shadow-card">
+        <h2 className="mb-3 text-sm font-semibold text-ink-700 dark:text-ink-200">
           Enter price per piece
         </h2>
         <div className="space-y-3">
           {bill.items.map((it) => (
             <div
               key={it.parcelId}
-              className="flex items-center gap-3 rounded-xl border border-ink-100 p-3"
+              className="flex items-center gap-3 rounded-xl border border-ink-100 dark:border-ink-800 p-3"
             >
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-blue-600">{it.dNumber}</p>
-                <p className="truncate text-xs text-ink-600">{it.name}</p>
+                <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">{it.dNumber}</p>
+                <p className="truncate text-xs text-ink-600 dark:text-ink-300">{it.name}</p>
               </div>
               <input
                 type="number"
@@ -350,31 +350,31 @@ function PricingForm({ bill, onCancel, onSaved }) {
                   setPrices((prev) => ({ ...prev, [it.parcelId]: e.target.value }))
                 }
                 placeholder="Price"
-                className="h-11 w-28 rounded-lg border border-ink-200 px-3 text-right text-sm tabular-nums outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                className="h-11 w-28 rounded-lg border border-ink-200 dark:border-ink-700 px-3 text-right text-sm tabular-nums outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
               />
             </div>
           ))}
         </div>
-        <div className="mt-3 flex items-center justify-between border-t border-ink-100 pt-3 text-base font-bold text-ink-900">
+        <div className="mt-3 flex items-center justify-between border-t border-ink-100 dark:border-ink-800 pt-3 text-base font-bold text-ink-900 dark:text-white">
           <span>Total</span>
           <span className="tabular-nums">₹{total.toLocaleString("en-IN")}</span>
         </div>
       </div>
 
-      <div className="rounded-2xl border border-ink-100 bg-white p-4 shadow-card">
-        <label className="mb-1.5 block text-sm font-semibold text-ink-700">
+      <div className="rounded-2xl border border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 p-4 shadow-card">
+        <label className="mb-1.5 block text-sm font-semibold text-ink-700 dark:text-ink-200">
           Note (optional)
         </label>
         <textarea
           value={note}
           onChange={(e) => setNote(e.target.value)}
           rows={2}
-          className="w-full rounded-xl border border-ink-200 px-4 py-3 text-base outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+          className="w-full rounded-xl border border-ink-200 dark:border-ink-700 px-4 py-3 text-base outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
         />
       </div>
 
       {error && (
-        <p role="alert" className="px-1 text-sm font-medium text-red-600">
+        <p role="alert" className="px-1 text-sm font-medium text-red-600 dark:text-red-400">
           {error}
         </p>
       )}
@@ -382,7 +382,7 @@ function PricingForm({ bill, onCancel, onSaved }) {
       <div className="flex gap-2 pb-4">
         <button
           onClick={onCancel}
-          className="h-12 flex-1 rounded-xl border border-ink-200 text-sm font-semibold text-ink-700 active:scale-[0.98]"
+          className="h-12 flex-1 rounded-xl border border-ink-200 dark:border-ink-700 text-sm font-semibold text-ink-700 dark:text-ink-200 active:scale-[0.98]"
         >
           Cancel
         </button>
@@ -458,21 +458,21 @@ function ItemsEditForm({ bill, onCancel, onSaved }) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-3.5 text-sm font-medium text-indigo-800">
+      <div className="rounded-2xl border border-indigo-100 dark:border-indigo-900 bg-indigo-50/60 p-3.5 text-sm font-medium text-indigo-800 dark:text-indigo-200">
         {selectedIds.size} piece{selectedIds.size === 1 ? "" : "s"} selected for{" "}
         <span className="font-bold">{bill.billNo}</span>. Tick to add, untick to remove.
       </div>
 
-      <div className="rounded-2xl border border-ink-100 bg-white p-4 shadow-card">
-        <label className="mb-1.5 block text-sm font-semibold text-ink-700">
+      <div className="rounded-2xl border border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 p-4 shadow-card">
+        <label className="mb-1.5 block text-sm font-semibold text-ink-700 dark:text-ink-200">
           Bill Number
         </label>
         <input
           value={billNo}
           onChange={(e) => setBillNo(e.target.value)}
-          className="h-12 w-full rounded-xl border border-ink-200 px-4 text-base outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+          className="h-12 w-full rounded-xl border border-ink-200 dark:border-ink-700 px-4 text-base outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
         />
-        <label className="mb-1.5 mt-4 block text-sm font-semibold text-ink-700">
+        <label className="mb-1.5 mt-4 block text-sm font-semibold text-ink-700 dark:text-ink-200">
           Description (optional)
         </label>
         <textarea
@@ -480,21 +480,21 @@ function ItemsEditForm({ bill, onCancel, onSaved }) {
           onChange={(e) => setNote(e.target.value)}
           rows={2}
           placeholder="Any note for this batch"
-          className="w-full rounded-xl border border-ink-200 px-4 py-3 text-base outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+          className="w-full rounded-xl border border-ink-200 dark:border-ink-700 px-4 py-3 text-base outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
         />
       </div>
 
-      <div className="rounded-2xl border border-ink-100 bg-white p-4 shadow-card">
+      <div className="rounded-2xl border border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 p-4 shadow-card">
         {loadingParcels ? (
           <div className="space-y-2.5">
             {[0, 1, 2].map((i) => (
-              <div key={i} className="h-14 animate-pulse rounded-xl bg-ink-50" />
+              <div key={i} className="h-14 animate-pulse rounded-xl bg-ink-50 dark:bg-ink-950" />
             ))}
           </div>
         ) : loadError ? (
-          <p className="text-sm text-red-600">Could not load parcels: {loadError}</p>
+          <p className="text-sm text-red-600 dark:text-red-400">Could not load parcels: {loadError}</p>
         ) : selectable.length === 0 ? (
-          <p className="text-sm text-ink-500">No parcel photos available.</p>
+          <p className="text-sm text-ink-500 dark:text-ink-400">No parcel photos available.</p>
         ) : (
           <div className="max-h-[50vh] space-y-2 overflow-y-auto">
             {selectable.map((p) => {
@@ -503,7 +503,7 @@ function ItemsEditForm({ bill, onCancel, onSaved }) {
                 <label
                   key={p._id}
                   className={`flex cursor-pointer items-center gap-3 rounded-xl border p-2.5 ${
-                    checked ? "border-indigo-300 bg-indigo-50/60" : "border-ink-100"
+                    checked ? "border-indigo-300 bg-indigo-50/60" : "border-ink-100 dark:border-ink-800"
                   }`}
                 >
                   <input
@@ -518,9 +518,9 @@ function ItemsEditForm({ bill, onCancel, onSaved }) {
                     className="h-12 w-12 shrink-0 rounded-lg object-cover"
                   />
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-blue-600">{p.dNumber}</p>
-                    <p className="truncate text-xs text-ink-600">{p.note}</p>
-                    <p className="truncate text-[11px] text-ink-400">{p.customerName}</p>
+                    <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">{p.dNumber}</p>
+                    <p className="truncate text-xs text-ink-600 dark:text-ink-300">{p.note}</p>
+                    <p className="truncate text-[11px] text-ink-400 dark:text-ink-500">{p.customerName}</p>
                   </div>
                 </label>
               );
@@ -530,7 +530,7 @@ function ItemsEditForm({ bill, onCancel, onSaved }) {
       </div>
 
       {error && (
-        <p role="alert" className="px-1 text-sm font-medium text-red-600">
+        <p role="alert" className="px-1 text-sm font-medium text-red-600 dark:text-red-400">
           {error}
         </p>
       )}
@@ -538,7 +538,7 @@ function ItemsEditForm({ bill, onCancel, onSaved }) {
       <div className="flex gap-2 pb-4">
         <button
           onClick={onCancel}
-          className="h-12 flex-1 rounded-xl border border-ink-200 text-sm font-semibold text-ink-700 active:scale-[0.98]"
+          className="h-12 flex-1 rounded-xl border border-ink-200 dark:border-ink-700 text-sm font-semibold text-ink-700 dark:text-ink-200 active:scale-[0.98]"
         >
           Cancel
         </button>

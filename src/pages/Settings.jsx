@@ -2,7 +2,8 @@ import { useState } from "react";
 import * as store from "../lib/storage";
 import { downloadReportExcel } from "../lib/exportExcel";
 import { useAuth } from "../context/AuthContext";
-import { LogoutIcon, PhoneIcon, DownloadIcon } from "../components/Icons";
+import { useTheme } from "../context/ThemeContext";
+import { LogoutIcon, PhoneIcon, DownloadIcon, SunIcon, MoonIcon } from "../components/Icons";
 
 function todayISO() {
   const d = new Date();
@@ -23,6 +24,7 @@ function daysAgoISO(days) {
 
 export default function Settings() {
   const { signOut } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const business = store.getBusiness();
 
   const [from, setFrom] = useState(startOfMonthISO());
@@ -66,43 +68,81 @@ export default function Settings() {
   }
 
   return (
-    <div className="min-h-dvh bg-ink-50 pb-28">
-      <header className="bg-white px-5 pb-4 pt-6 shadow-card">
-        <h1 className="text-xl font-bold text-ink-900">Settings</h1>
-        <p className="mt-1 text-sm text-ink-500">
+    <div className="min-h-dvh bg-ink-50 dark:bg-ink-950 pb-28">
+      <header className="bg-white dark:bg-ink-900 px-5 pb-4 pt-6 shadow-card">
+        <h1 className="text-xl font-bold text-ink-900 dark:text-white">Settings</h1>
+        <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
           Business details that appear on every invoice
         </p>
       </header>
 
       <main className="px-5 pt-4">
-        <section className="rounded-2xl border border-ink-100 bg-white p-4 shadow-card">
+        <section className="rounded-2xl border border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 p-4 shadow-card">
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-ink-900 text-lg font-bold text-white">
               {business.logoInitial}
             </div>
             <div>
-              <p className="text-[15px] font-bold text-ink-900">
+              <p className="text-[15px] font-bold text-ink-900 dark:text-white">
                 {business.name}
               </p>
-              <p className="flex items-center gap-1.5 text-xs text-ink-500">
+              <p className="flex items-center gap-1.5 text-xs text-ink-500 dark:text-ink-400">
                 <PhoneIcon width={12} height={12} /> {business.phone}
               </p>
             </div>
           </div>
-          <p className="mt-3 text-sm text-ink-600">{business.address}</p>
+          <p className="mt-3 text-sm text-ink-600 dark:text-ink-300">{business.address}</p>
 
-          <div className="mt-4 rounded-xl bg-ink-50 px-3.5 py-3 text-xs text-ink-500">
+          <div className="mt-4 rounded-xl bg-ink-50 dark:bg-ink-950 px-3.5 py-3 text-xs text-ink-500 dark:text-ink-400">
             This is fixed at the code level. To change it, edit{" "}
-            <code className="rounded bg-white px-1.5 py-0.5 font-mono text-ink-700">
+            <code className="rounded bg-white dark:bg-ink-900 px-1.5 py-0.5 font-mono text-ink-700 dark:text-ink-200">
               src/config/business.js
             </code>{" "}
             and rebuild the app.
           </div>
         </section>
 
-        <section className="mt-4 rounded-2xl border border-ink-100 bg-white p-4 shadow-card">
-          <p className="text-sm font-semibold text-ink-700">Export Data (Excel)</p>
-          <p className="mt-1 text-sm text-ink-500">
+        <section className="mt-4 rounded-2xl border border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 p-4 shadow-card">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-ink-50 dark:bg-ink-950 text-ink-600 dark:text-ink-300">
+                {theme === "dark" ? (
+                  <MoonIcon width={18} height={18} />
+                ) : (
+                  <SunIcon width={18} height={18} />
+                )}
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-ink-700 dark:text-ink-200">
+                  Dark Mode
+                </p>
+                <p className="text-xs text-ink-500 dark:text-ink-400">
+                  {theme === "dark" ? "On" : "Off"} — invoices you share always stay
+                  light, regardless of this setting
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={theme === "dark"}
+              onClick={toggleTheme}
+              className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
+                theme === "dark" ? "bg-brand-500" : "bg-ink-200 dark:bg-ink-700"
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
+                  theme === "dark" ? "translate-x-[22px]" : "translate-x-0.5"
+                }`}
+              />
+            </button>
+          </div>
+        </section>
+
+        <section className="mt-4 rounded-2xl border border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 p-4 shadow-card">
+          <p className="text-sm font-semibold text-ink-700 dark:text-ink-200">Export Data (Excel)</p>
+          <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
             Download parcels, customer bills, and dealer bills for a date
             range — one clear spreadsheet showing which phone went where and
             when, for whenever you need to trace a problem.
@@ -110,25 +150,25 @@ export default function Settings() {
 
           <div className="mt-4 grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-ink-700">
+              <label className="mb-1.5 block text-xs font-medium text-ink-700 dark:text-ink-200">
                 From
               </label>
               <input
                 type="date"
                 value={from}
                 onChange={(e) => setFrom(e.target.value)}
-                className="h-11 w-full rounded-xl border border-ink-200 px-3 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+                className="h-11 w-full rounded-xl border border-ink-200 dark:border-ink-700 px-3 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-ink-700">
+              <label className="mb-1.5 block text-xs font-medium text-ink-700 dark:text-ink-200">
                 To
               </label>
               <input
                 type="date"
                 value={to}
                 onChange={(e) => setTo(e.target.value)}
-                className="h-11 w-full rounded-xl border border-ink-200 px-3 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+                className="h-11 w-full rounded-xl border border-ink-200 dark:border-ink-700 px-3 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
               />
             </div>
           </div>
@@ -144,7 +184,7 @@ export default function Settings() {
                 key={p.key}
                 type="button"
                 onClick={() => applyPreset(p.key)}
-                className="rounded-full bg-ink-50 px-3 py-1.5 text-xs font-semibold text-ink-600 active:scale-95"
+                className="rounded-full bg-ink-50 dark:bg-ink-950 px-3 py-1.5 text-xs font-semibold text-ink-600 dark:text-ink-300 active:scale-95"
               >
                 {p.label}
               </button>
@@ -152,7 +192,7 @@ export default function Settings() {
           </div>
 
           {error && (
-            <p role="alert" className="mt-3 text-sm font-medium text-red-600">
+            <p role="alert" className="mt-3 text-sm font-medium text-red-600 dark:text-red-400">
               {error}
             </p>
           )}
@@ -166,27 +206,27 @@ export default function Settings() {
             {exporting ? "Preparing…" : "Download Excel Report"}
           </button>
 
-          <p className="mt-3 text-xs text-ink-400">
+          <p className="mt-3 text-xs text-ink-400 dark:text-ink-500">
             The file has separate sheets: Summary, Parcels, Customer Bills,
             and Dealer Bills.
           </p>
         </section>
 
-        <section className="mt-4 rounded-2xl border border-ink-100 bg-white p-4 shadow-card">
-          <p className="text-sm font-semibold text-ink-700">Data storage</p>
-          <p className="mt-1 text-sm text-ink-500">
+        <section className="mt-4 rounded-2xl border border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 p-4 shadow-card">
+          <p className="text-sm font-semibold text-ink-700 dark:text-ink-200">Data storage</p>
+          <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
             Customers, bills, parcels, and dealer bills are stored in
             MongoDB via the API in{" "}
-            <code className="rounded bg-ink-50 px-1.5 py-0.5 font-mono text-ink-700">
+            <code className="rounded bg-ink-50 dark:bg-ink-950 px-1.5 py-0.5 font-mono text-ink-700 dark:text-ink-200">
               server/
             </code>{" "}
             (Express) and{" "}
-            <code className="rounded bg-ink-50 px-1.5 py-0.5 font-mono text-ink-700">
+            <code className="rounded bg-ink-50 dark:bg-ink-950 px-1.5 py-0.5 font-mono text-ink-700 dark:text-ink-200">
               api/
             </code>{" "}
             (Vercel serverless functions) — every screen talks to them
             through{" "}
-            <code className="rounded bg-ink-50 px-1.5 py-0.5 font-mono text-ink-700">
+            <code className="rounded bg-ink-50 dark:bg-ink-950 px-1.5 py-0.5 font-mono text-ink-700 dark:text-ink-200">
               src/lib/api.js
             </code>
             . Parcel photos are stored in Vercel Blob.
@@ -195,7 +235,7 @@ export default function Settings() {
 
         <button
           onClick={signOut}
-          className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-red-100 bg-red-50 text-base font-semibold text-red-600 active:scale-[0.98]"
+          className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-red-100 dark:border-red-900 bg-red-50 dark:bg-red-950 text-base font-semibold text-red-600 dark:text-red-400 active:scale-[0.98]"
         >
           <LogoutIcon width={18} height={18} /> Log Out
         </button>

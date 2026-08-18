@@ -2,6 +2,11 @@
 
 A mobile-first React + Vite + Tailwind app to create branded invoices, backed by a small Express + MongoDB API, with export/share to PDF and JPG.
 
+> **New here, or need the full picture?** See **`PROJECT_OVERVIEW.md`** for
+> the business context behind this app, every feature explained with the
+> reasoning behind it, the architecture, and known limitations. This file
+> is the setup/how-to; that one is the why.
+
 ## Setup
 
 1. Copy the env file and fill in your MongoDB connection string:

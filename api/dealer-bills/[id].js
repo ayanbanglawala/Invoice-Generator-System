@@ -34,7 +34,7 @@ export default async function handler(req, res) {
   }
 
   if (req.method === "DELETE") {
-    await Parcel.updateMany({ dealerBillId: id }, { $set: { dealerBillId: null } });
+    await Parcel.updateMany({ dealerBillId: id }, { $set: { dealerBillId: null, dealerPrice: null } });
     await DealerBill.findByIdAndDelete(id);
     return res.status(204).end();
   }

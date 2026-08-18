@@ -15,6 +15,16 @@ html, body, #root {
 body {
   font-family: 'Inter', system-ui, sans-serif;
   background: #f4f6f9;
+  transition: background-color 0.15s ease;
+}
+
+html.dark body {
+  background: #0b0d14;
+}
+
+html.dark input[type="date"],
+html.dark input[type="time"] {
+  color-scheme: dark;
 }
 
 input[type=number]::-webkit-inner-spin-button,

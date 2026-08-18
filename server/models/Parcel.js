@@ -15,6 +15,11 @@ const parcelSchema = new mongoose.Schema(
     // Dealer bundles are exclusive — once a parcel is packed into one dealer
     // bundle it can't be picked for another, so this is a single ref, not a list.
     dealerBillId: { type: mongoose.Schema.Types.ObjectId, ref: "DealerBill", default: null },
+    // Copied over from the dealer bundle's item once it's priced (see
+    // applyDealerBillUpdate). Lets the Home tab show "expected payment" for
+    // parcels that have a known dealer price but no customer bill yet,
+    // without joining through DealerBill.items on every page load.
+    dealerPrice: { type: Number, default: null },
   },
   { timestamps: true }
 );

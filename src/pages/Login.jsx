@@ -27,23 +27,23 @@ export default function Login() {
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-500 text-white shadow-pop">
             <ReceiptIcon width={30} height={30} />
           </div>
-          <h1 className="mt-4 text-2xl font-bold text-ink-900">
+          <h1 className="mt-4 text-2xl font-bold text-ink-900 dark:text-white">
             Invoice Manager
           </h1>
-          <p className="mt-1 text-sm text-ink-500">
+          <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
             Sign in to create and manage bills
           </p>
         </div>
 
         <form
           onSubmit={handleSubmit}
-          className="rounded-2xl border border-ink-100 bg-white p-5 shadow-card"
+          className="rounded-2xl border border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 p-5 shadow-card"
         >
           <div className="space-y-4">
             <div>
               <label
                 htmlFor="username"
-                className="mb-1.5 block text-sm font-medium text-ink-700"
+                className="mb-1.5 block text-sm font-medium text-ink-700 dark:text-ink-200"
               >
                 User ID
               </label>
@@ -54,14 +54,14 @@ export default function Login() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="admin"
-                className="h-12 w-full rounded-xl border border-ink-200 px-4 text-base text-ink-900 outline-none transition-colors focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+                className="h-12 w-full rounded-xl border border-ink-200 dark:border-ink-700 px-4 text-base text-ink-900 dark:text-white outline-none transition-colors focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
                 required
               />
             </div>
             <div>
               <label
                 htmlFor="password"
-                className="mb-1.5 block text-sm font-medium text-ink-700"
+                className="mb-1.5 block text-sm font-medium text-ink-700 dark:text-ink-200"
               >
                 Password
               </label>
@@ -72,13 +72,13 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="admin"
-                className="h-12 w-full rounded-xl border border-ink-200 px-4 text-base text-ink-900 outline-none transition-colors focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+                className="h-12 w-full rounded-xl border border-ink-200 dark:border-ink-700 px-4 text-base text-ink-900 dark:text-white outline-none transition-colors focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
                 required
               />
             </div>
 
             {error && (
-              <p role="alert" className="text-sm font-medium text-red-600">
+              <p role="alert" className="text-sm font-medium text-red-600 dark:text-red-400">
                 {error}
               </p>
             )}
@@ -92,7 +92,7 @@ export default function Login() {
           </div>
         </form>
 
-        <p className="mt-5 text-center text-xs text-ink-400">
+        <p className="mt-5 text-center text-xs text-ink-400 dark:text-ink-500">
           Default login — User ID: admin · Password: admin
         </p>
       </div>
