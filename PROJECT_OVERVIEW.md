@@ -201,7 +201,45 @@ gzipped). Loading it eagerly would have slowed down every single page
 load for a feature used maybe a few times a month. It only downloads when
 the Export button is actually tapped.
 
-### 2.7 Dark Mode
+### 2.7 Business logo on invoices/manifests
+
+**What it does**: the circular badge in the top-right of every customer
+invoice, dealer manifest, and the Settings page shows an actual logo image
+if one has been provided, instead of just the two-letter initials
+(`business.logoInitial`, e.g. "AR").
+
+**How to add your logo**: drop a square image file named exactly
+`logo.jpeg` into `src/assets/`. That's it — no code change, no config
+entry. Rebuild/redeploy (`git push`, or `npm run build` locally) and it
+appears everywhere the badge is shown. Removing the file reverts every
+badge back to the plain initials automatically.
+
+**Why it's a drop-in file instead of a `business.js` config field**: every
+other business detail (`name`, `address`, `phone`, `logoInitial`) is a
+plain string, trivial to hardcode in `src/config/business.js`. An image
+isn't a string — putting it through config would mean either a base64 blob
+inline in a JS file (ugly, bloats the bundle unpredictably) or another
+upload/storage flow just for one static asset that basically never
+changes. A file in `src/assets/` is the simplest possible way to swap a
+static image that's baked in at build time, consistent with how
+`hero.png` already lives there.
+
+**Why it silently falls back instead of erroring**: `src/components/BusinessLogo.jsx`
+uses `import.meta.glob` to look for `src/assets/` at build time.
+If the file isn't there, the glob returns nothing and the component
+falls back to the original initials badge — the app must build and run
+identically whether or not a logo has been supplied, since not every
+deployment of this app necessarily has a logo ready yet.
+
+**Where it's used**: `src/components/InvoiceTemplate.jsx` (customer
+invoice), `src/components/DealerManifestTemplate.jsx` (dealer manifest,
+both packed and priced states), and `src/pages/Settings.jsx` (the
+business-details preview card) — all three now render `<BusinessLogo
+business={business} size={...} />` instead of duplicating the
+initials-badge markup, so a logo shows up consistently everywhere the
+business identity appears.
+
+### 2.8 Dark Mode
 
 **Why it exists**: requested directly, no deeper business reason - but
 worth noting the one deliberate exception: **the invoice/manifest

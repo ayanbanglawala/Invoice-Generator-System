@@ -61,6 +61,15 @@ This stays local to the browser (localStorage) — deliberately not in the datab
 
 Open `src/config/business.js` and change the name, address, phone, and logo initial. This appears on every invoice automatically — no UI or database involved.
 
+## Add your logo
+
+Drop a square image file named exactly `logo.jpeg` into `src/assets/`.
+Rebuild (`npm run build`) or redeploy (`git push` on Vercel) and it will
+appear as the circular badge on every customer invoice, dealer manifest,
+and the Settings page — replacing the plain-text initials badge
+automatically. No code change needed. If you remove `logo.jpeg`, everything
+falls back to the initials badge with no errors.
+
 ## Data storage — now MongoDB
 
 Customers and bills are stored in MongoDB via the Express API in `server/`:

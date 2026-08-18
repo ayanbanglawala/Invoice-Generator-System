@@ -4,6 +4,7 @@ import { downloadReportExcel } from "../lib/exportExcel";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { LogoutIcon, PhoneIcon, DownloadIcon, SunIcon, MoonIcon } from "../components/Icons";
+import BusinessLogo from "../components/BusinessLogo";
 
 function todayISO() {
   const d = new Date();
@@ -79,9 +80,7 @@ export default function Settings() {
       <main className="px-5 pt-4">
         <section className="rounded-2xl border border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 p-4 shadow-card">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-ink-900 text-lg font-bold text-white">
-              {business.logoInitial}
-            </div>
+            <BusinessLogo business={business} size={48} />
             <div>
               <p className="text-[15px] font-bold text-ink-900 dark:text-white">
                 {business.name}
