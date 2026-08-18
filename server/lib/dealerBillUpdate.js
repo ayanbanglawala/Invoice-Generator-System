@@ -104,8 +104,14 @@ export async function applyDealerBillUpdate(bill, payload) {
 
   // Any item still at price 0 means it hasn't been priced yet — keep/return
   // the bundle to "packed" so the price-entry screen picks it back up.
-  // Otherwise, only promote to "priced" if it already was (never auto-jump
-  // straight from "packed" to "priced" just because composition changed).
+  // If every item is priced AND this update actually went through the
+  // pricing flow (an `items` payload), promote to "priced". A composition
+  // -only edit (`parcelIds` with no `items`) never auto-jumps the status on
+  // its own — it just preserves whatever status the bundle already had.
   const hasUnpriced = bill.items.some((it) => Number(it.price) === 0);
-  bill.status = hasUnpriced ? "packed" : bill.status === "priced" ? "priced" : bill.status;
+  if (hasUnpriced) {
+    bill.status = "packed";
+  } else if (Array.isArray(items)) {
+    bill.status = "priced";
+  }
 }
