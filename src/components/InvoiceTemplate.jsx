@@ -1,5 +1,4 @@
 import { forwardRef } from "react";
-import BusinessLogo from "./BusinessLogo";
 
 function formatDate(iso) {
   if (!iso) return "";
@@ -49,7 +48,9 @@ const InvoiceTemplate = forwardRef(function InvoiceTemplate(
               <PhoneIcon /> {business.phone}
             </p>
           </div>
-          <BusinessLogo business={business} size={56} />
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-ink-900 text-xl font-bold text-white">
+            {business.logoInitial || business.name?.[0] || "B"}
+          </div>
         </div>
 
         <div className="mt-5 flex items-start justify-between border-t border-ink-100 pt-4">
