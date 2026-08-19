@@ -73,8 +73,11 @@ export default function DealerBillView() {
 
   async function buildPdf() {
     const canvas = await captureCanvas();
-    const imgData = canvas.toDataURL("image/png");
-    const pdf = new jsPDF({ unit: "pt", format: "a4" });
+    // JPEG instead of PNG: flat text/lines on a white background compress
+    // far better as JPEG with no visible quality loss, and PNG was making
+    // every manifest/invoice PDF several MB for no visual benefit.
+    const imgData = canvas.toDataURL("image/jpeg", 0.92);
+    const pdf = new jsPDF({ unit: "pt", format: "a4", compress: true });
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
     const imgRatio = canvas.width / canvas.height;
@@ -85,7 +88,7 @@ export default function DealerBillView() {
       renderWidth = renderHeight * imgRatio;
     }
     const x = (pageWidth - renderWidth) / 2;
-    pdf.addImage(imgData, "PNG", x, 24, renderWidth, renderHeight);
+    pdf.addImage(imgData, "JPEG", x, 24, renderWidth, renderHeight, undefined, "FAST");
     return pdf;
   }
 
