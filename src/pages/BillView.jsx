@@ -74,11 +74,16 @@ export default function BillView() {
 
   async function buildPdf() {
     const canvas = await captureCanvas();
-    const imgData = canvas.toDataURL("image/png");
+    // JPEG instead of PNG: the invoice is flat text/lines on a white
+    // background, so lossless PNG buys nothing visually here but makes the
+    // embedded image (and therefore the PDF) many times larger. 0.92 quality
+    // is visually indistinguishable at this content type while cutting file
+    // size roughly 5-10x.
+    const imgData = canvas.toDataURL("image/jpeg", 0.92);
 
     // Convert the captured pixel canvas into an A4-proportioned PDF page,
     // centered, so it prints cleanly instead of being pixel-for-pixel forced.
-    const pdf = new jsPDF({ unit: "pt", format: "a4" });
+    const pdf = new jsPDF({ unit: "pt", format: "a4", compress: true });
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
 
@@ -92,7 +97,7 @@ export default function BillView() {
     const x = (pageWidth - renderWidth) / 2;
     const y = 24;
 
-    pdf.addImage(imgData, "PNG", x, y, renderWidth, renderHeight);
+    pdf.addImage(imgData, "JPEG", x, y, renderWidth, renderHeight, undefined, "FAST");
     return pdf;
   }
 
