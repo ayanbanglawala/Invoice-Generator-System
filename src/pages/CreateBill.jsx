@@ -10,6 +10,11 @@ function todayISO() {
   return new Date(d.getTime() - off * 60000).toISOString().slice(0, 10);
 }
 
+// Extend this list any time you want a new series available in the
+// dropdown — the counter for a brand-new series starts fresh from :001
+// automatically the first time it's used.
+const BILL_SERIES_OPTIONS = ["AZ", "G"];
+
 function emptyItem() {
   return { id: crypto.randomUUID(), sr: "", name: "", qty: 1, price: "", parcelId: null };
 }
@@ -20,7 +25,10 @@ function itemFromParcel(parcel) {
     sr: parcel.dNumber,
     name: parcel.note,
     qty: 1,
-    price: "",
+    // Pre-fill from the dealer-priced amount when available (still fully
+    // editable) so bills created from the Pending Payments list don't need
+    // prices typed in by hand.
+    price: parcel.dealerPrice != null ? String(parcel.dealerPrice) : "",
     parcelId: parcel._id,
   };
 }
@@ -65,10 +73,47 @@ export default function CreateBill() {
 
   const [dateOfIssue, setDateOfIssue] = useState(todayISO());
   const [billNo, setBillNo] = useState("");
+  const [billSeries, setBillSeries] = useState("__manual__");
+  const [billNoError, setBillNoError] = useState("");
   const [items, setItems] = useState([emptyItem()]);
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+
+  // Auto-load parcels passed via ?parcelIds=id1,id2,... (used by the
+  // "Create Bill for <bill>" buttons on the Home pending-payments list) —
+  // pre-fills one item per parcel, price included but still editable, so
+  // nothing has to be typed in by hand.
+  useEffect(() => {
+    if (parcels.length === 0) return;
+    const idsParam = searchParams.get("parcelIds");
+    if (!idsParam) return;
+    const ids = idsParam.split(",").filter(Boolean);
+    if (ids.length === 0) return;
+    const matched = ids
+      .map((id) => parcels.find((p) => p._id === id))
+      .filter(Boolean);
+    if (matched.length === 0) return;
+    setItems(matched.map(itemFromParcel));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [parcels]);
+
+  async function handleSeriesChange(value) {
+    setBillSeries(value);
+    setBillNoError("");
+    if (value === "__manual__") {
+      setBillNo("");
+      return;
+    }
+    setBillNo("Generating…");
+    try {
+      const { billNo: generated } = await store.getNextBillNumber(value);
+      setBillNo(generated);
+    } catch (err) {
+      setBillNoError(`Could not generate a number: ${err.message}`);
+      setBillNo("");
+    }
+  }
 
   const totals = useMemo(() => store.computeTotals(items), [items]);
 
@@ -249,13 +294,41 @@ export default function CreateBill() {
           <label className="mb-1.5 block text-sm font-semibold text-ink-700 dark:text-ink-200">
             Bill / Invoice Number
           </label>
-          <input
-            value={billNo}
-            onChange={(e) => setBillNo(e.target.value)}
-            placeholder="e.g. INV-101 or 24"
-            className="h-12 w-full rounded-xl border border-ink-200 dark:border-ink-700 px-4 text-base outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
-            required
-          />
+          <div className="flex gap-2">
+            <select
+              value={billSeries}
+              onChange={(e) => handleSeriesChange(e.target.value)}
+              className="h-12 shrink-0 rounded-xl border border-ink-200 dark:border-ink-700 bg-white dark:bg-ink-900 px-3 text-base outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+            >
+              {BILL_SERIES_OPTIONS.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+              <option value="__manual__">Manual</option>
+            </select>
+            <input
+              value={billNo}
+              onChange={(e) => setBillNo(e.target.value)}
+              readOnly={billSeries !== "__manual__"}
+              placeholder={billSeries === "__manual__" ? "e.g. INV-101 or 24" : "Generating…"}
+              className={`h-12 w-full rounded-xl border border-ink-200 dark:border-ink-700 px-4 text-base outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 ${
+                billSeries !== "__manual__" ? "bg-ink-50 dark:bg-ink-950 font-semibold" : ""
+              }`}
+              required
+            />
+          </div>
+          {billSeries !== "__manual__" && (
+            <p className="mt-1.5 text-xs text-ink-500 dark:text-ink-400">
+              Auto-generated for the {billSeries} series — always unique, never reused.
+              Switch to "Manual" to type your own instead.
+            </p>
+          )}
+          {billNoError && (
+            <p className="mt-1.5 text-xs font-medium text-red-600 dark:text-red-400">
+              {billNoError}
+            </p>
+          )}
         </section>
 
         {/* Date */}

@@ -19,6 +19,23 @@ function formatDate(iso) {
   });
 }
 
+// Splits a customer's pending pieces up by which dealer bundle/bill they
+// came from, preserving the order bills first appear in.
+function groupPiecesByDealerBill(pieces) {
+  const groups = [];
+  const indexByBillId = new Map();
+  for (const p of pieces) {
+    const key = p.dealerBillId?._id || "no-bill";
+    const label = p.dealerBillId?.billNo || "No dealer bill";
+    if (!indexByBillId.has(key)) {
+      indexByBillId.set(key, groups.length);
+      groups.push({ key, billNo: label, pieces: [] });
+    }
+    groups[indexByBillId.get(key)].pieces.push(p);
+  }
+  return groups;
+}
+
 export default function Dashboard() {
   const { signOut } = useAuth();
   const [query, setQuery] = useState("");
@@ -226,30 +243,41 @@ export default function Dashboard() {
 
                       {isOpen && (
                         <div className="border-t border-ink-100 dark:border-ink-800 p-3">
-                          <ul className="space-y-1.5">
-                            {group.pieces.map((p) => (
-                              <li
-                                key={p._id}
-                                className="flex items-center justify-between text-sm"
-                              >
-                                <span className="text-ink-700 dark:text-ink-200">
-                                  <span className="font-semibold text-blue-600 dark:text-blue-400">
-                                    {p.dNumber}
-                                  </span>{" "}
-                                  — {p.note}
-                                </span>
-                                <span className="tabular-nums font-medium text-ink-900 dark:text-white">
-                                  ₹{p.dealerPrice.toLocaleString("en-IN")}
-                                </span>
-                              </li>
+                          <div className="space-y-3">
+                            {groupPiecesByDealerBill(group.pieces).map((dBill) => (
+                              <div key={dBill.key}>
+                                <p className="mb-1 text-xs font-bold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                                  {dBill.billNo}
+                                </p>
+                                <ul className="space-y-1.5">
+                                  {dBill.pieces.map((p) => (
+                                    <li
+                                      key={p._id}
+                                      className="flex items-center justify-between text-sm"
+                                    >
+                                      <span className="text-ink-700 dark:text-ink-200">
+                                        <span className="font-semibold text-blue-600 dark:text-blue-400">
+                                          {p.dNumber}
+                                        </span>{" "}
+                                        — {p.note}
+                                      </span>
+                                      <span className="tabular-nums font-medium text-ink-900 dark:text-white">
+                                        ₹{p.dealerPrice.toLocaleString("en-IN")}
+                                      </span>
+                                    </li>
+                                  ))}
+                                </ul>
+                                <Link
+                                  to={`/bills/new?customerId=${group.customerId || ""}&parcelIds=${dBill.pieces
+                                    .map((p) => p._id)
+                                    .join(",")}`}
+                                  className="mt-2 flex h-10 w-full items-center justify-center rounded-lg bg-brand-500 text-sm font-semibold text-white active:scale-[0.98]"
+                                >
+                                  Create Bill for {dBill.billNo}
+                                </Link>
+                              </div>
                             ))}
-                          </ul>
-                          <Link
-                            to={`/bills/new?customerId=${group.customerId || ""}`}
-                            className="mt-3 flex h-10 w-full items-center justify-center rounded-lg bg-brand-500 text-sm font-semibold text-white active:scale-[0.98]"
-                          >
-                            Create Bill for {group.customerName}
-                          </Link>
+                          </div>
                         </div>
                       )}
                     </div>

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import Bill from "../models/Bill.js";
 import Parcel from "../models/Parcel.js";
+import { nextBillNumber } from "../lib/billCounter.js";
 
 const router = Router();
 
@@ -45,6 +46,21 @@ router.get("/grouped", async (req, res) => {
     },
   ]);
   res.json(groups);
+});
+
+// GET /api/bills/next-number?series=AZ — atomically allocates and returns
+// the next bill number in that series, e.g. { billNo: "AZ:001" }.
+router.get("/next-number", async (req, res) => {
+  try {
+    const { series } = req.query;
+    if (!series || !series.trim()) {
+      return res.status(400).json({ error: "Series is required." });
+    }
+    const billNo = await nextBillNumber(series);
+    res.json({ billNo });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 // GET /api/bills/:id

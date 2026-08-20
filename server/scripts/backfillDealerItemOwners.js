@@ -16,17 +16,18 @@ import Parcel from "../models/Parcel.js";
 
 dotenv.config();
 
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/invoice_manager";
+const MONGODB_URI = process.env.MONGODB_URI || "mongodb+srv://ayanchhipa2278:ayan8722@ayandb.9poow.mongodb.net/invoice-generator-db";
 
 async function run() {
   await mongoose.connect(MONGODB_URI);
   console.log("Connected:", MONGODB_URI);
 
-  const bills = await DealerBill.find({ "items.ownerName": { $in: [null, ""] } });
-  console.log(`Found ${bills.length} dealer bundle(s) with missing owner names.`);
+  const bills = await DealerBill.find();
+  console.log(`Checking ${bills.length} dealer bundle(s).`);
 
   let updatedBills = 0;
   let updatedItems = 0;
+  let missingParcel = 0;
 
   for (const bill of bills) {
     const parcelIds = bill.items.map((it) => it.parcelId).filter(Boolean);
@@ -34,25 +35,41 @@ async function run() {
     const nameByParcelId = new Map(parcels.map((p) => [String(p._id), p.customerName]));
 
     let changed = false;
-    for (const item of bill.items) {
-      if (!item.ownerName) {
-        const owner = nameByParcelId.get(String(item.parcelId));
+    // Rebuild the whole items array (rather than mutating individual
+    // subdocuments in place) and reassign it — with `{ _id: false }`
+    // subdocuments, in-place field mutation doesn't always get picked up
+    // by Mongoose's change tracking, so reassigning + markModified is the
+    // reliable way to make sure it actually persists on save().
+    const newItems = bill.items.map((it) => {
+      const obj = typeof it.toObject === "function" ? it.toObject() : { ...it };
+      if (!obj.ownerName) {
+        const owner = nameByParcelId.get(String(obj.parcelId));
         if (owner) {
-          item.ownerName = owner;
+          obj.ownerName = owner;
           changed = true;
           updatedItems += 1;
+        } else {
+          missingParcel += 1;
+          console.warn(
+            `  no matching parcel for ${obj.dNumber} in ${bill.billNo} (parcelId ${obj.parcelId}) — leaving as Unknown`
+          );
         }
       }
-    }
+      return obj;
+    });
 
     if (changed) {
+      bill.items = newItems;
+      bill.markModified("items");
       await bill.save();
       updatedBills += 1;
       console.log(`Updated ${bill.billNo} (${bill._id})`);
     }
   }
 
-  console.log(`Done. Updated ${updatedItems} item(s) across ${updatedBills} bundle(s).`);
+  console.log(
+    `Done. Updated ${updatedItems} item(s) across ${updatedBills} bundle(s). ${missingParcel} item(s) had no matching parcel and stayed Unknown.`
+  );
   await mongoose.disconnect();
 }
 

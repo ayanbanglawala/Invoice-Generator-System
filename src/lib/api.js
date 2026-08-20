@@ -64,6 +64,13 @@ export function createBill(bill) {
   });
 }
 
+// Atomically allocates the next number in a series, e.g. series="AZ" ->
+// "AZ:001". Each call consumes a number — only call this when the user
+// actually picks/confirms a series, not on every render.
+export function getNextBillNumber(series) {
+  return request(`/bills/next-number?series=${encodeURIComponent(series)}`);
+}
+
 export function deleteBill(id) {
   return request(`/bills/${id}`, { method: "DELETE" });
 }
