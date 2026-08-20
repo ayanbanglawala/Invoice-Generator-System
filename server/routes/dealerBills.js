@@ -2,10 +2,6 @@ import { Router } from "express";
 import DealerBill from "../models/DealerBill.js";
 import Parcel from "../models/Parcel.js";
 import { applyDealerBillUpdate } from "../lib/dealerBillUpdate.js";
-import { nextBillNumber } from "../lib/billCounter.js";
-
-const DEALER_BILL_SERIES_OPTIONS = ["AZ", "G"];
-const DEFAULT_DEALER_BILL_SERIES = "AZ";
 
 const router = Router();
 
@@ -15,22 +11,17 @@ router.get("/", async (req, res) => {
   res.json(bills);
 });
 
-// POST /api/dealer-bills — bundle selected parcels under a new, auto
-// -generated number in the chosen series (AZ or G). The bill number is
-// never taken as free text from the client — it's allocated here,
-// atomically, the moment parcels are sent to the dealer, so it can never
-// collide or be skipped by mistake.
+// POST /api/dealer-bills — bundle selected parcels under a new A-number
 router.post("/", async (req, res) => {
   try {
-    const { note, parcelIds, series } = req.body;
+    const { billNo, note, parcelIds } = req.body;
 
+    if (!billNo || !billNo.trim()) {
+      return res.status(400).json({ error: "Bill number is required." });
+    }
     if (!Array.isArray(parcelIds) || parcelIds.length === 0) {
       return res.status(400).json({ error: "Select at least one parcel photo." });
     }
-
-    const cleanSeries = DEALER_BILL_SERIES_OPTIONS.includes(String(series || "").toUpperCase())
-      ? String(series).toUpperCase()
-      : DEFAULT_DEALER_BILL_SERIES;
 
     const parcels = await Parcel.find({ _id: { $in: parcelIds } });
     if (parcels.length !== parcelIds.length) {
@@ -54,10 +45,8 @@ router.post("/", async (req, res) => {
       price: 0,
     }));
 
-    const billNo = await nextBillNumber(cleanSeries);
-
     const dealerBill = await DealerBill.create({
-      billNo,
+      billNo: billNo.trim(),
       note: (note || "").trim(),
       items,
     });
