@@ -7,6 +7,10 @@ const dealerItemSchema = new mongoose.Schema(
     // is later deleted from the Parcels tab.
     dNumber: { type: String, required: true, trim: true },
     name: { type: String, required: true, trim: true },
+    // Denormalized from Parcel.customerName at the time the piece is packed,
+    // so the dealer bundle can be grouped/displayed by owner even if the
+    // parcel is later edited or deleted.
+    ownerName: { type: String, trim: true, default: "" },
     qty: { type: Number, required: true, default: 1, min: 1 },
     price: { type: Number, required: true, default: 0, min: 0 },
   },
