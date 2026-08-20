@@ -40,6 +40,7 @@ router.post("/", async (req, res) => {
       parcelId: p._id,
       dNumber: p.dNumber,
       name: p.note,
+      ownerName: p.customerName,
       qty: 1,
       price: 0,
     }));
