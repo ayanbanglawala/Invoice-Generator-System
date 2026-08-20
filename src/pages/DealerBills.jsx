@@ -12,6 +12,23 @@ function formatDate(iso) {
   });
 }
 
+// Groups a bundle's items by owner, preserving the order owners first
+// appear in (not alphabetical) so the list reads in the same order pieces
+// were packed.
+function groupByOwner(items) {
+  const groups = [];
+  const indexByOwner = new Map();
+  for (const it of items) {
+    const owner = it.ownerName?.trim() || "Unknown";
+    if (!indexByOwner.has(owner)) {
+      indexByOwner.set(owner, groups.length);
+      groups.push({ owner, items: [] });
+    }
+    groups[indexByOwner.get(owner)].items.push(it);
+  }
+  return groups;
+}
+
 export default function DealerBills() {
   const [bills, setBills] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -139,24 +156,33 @@ export default function DealerBills() {
 
                   {isOpen && (
                     <div className="border-t border-ink-100 dark:border-ink-800 p-4">
-                      <ul className="space-y-1.5">
-                        {bill.items.map((it) => (
-                          <li
-                            key={it.parcelId}
-                            className="flex items-center justify-between text-sm"
-                          >
-                            <span className="text-ink-700 dark:text-ink-200">
-                              <span className="font-semibold text-blue-600 dark:text-blue-400">{it.dNumber}</span>{" "}
-                              — {it.name}
-                            </span>
-                            {bill.status === "priced" && (
-                              <span className="tabular-nums font-medium text-ink-900 dark:text-white">
-                                ₹{it.price.toLocaleString("en-IN")}
-                              </span>
-                            )}
-                          </li>
+                      <div className="space-y-3">
+                        {groupByOwner(bill.items).map((group) => (
+                          <div key={group.owner}>
+                            <p className="mb-1 text-xs font-bold uppercase tracking-wide text-indigo-600 dark:text-indigo-400">
+                              {group.owner}
+                            </p>
+                            <ul className="space-y-1.5">
+                              {group.items.map((it) => (
+                                <li
+                                  key={it.parcelId}
+                                  className="flex items-center justify-between text-sm"
+                                >
+                                  <span className="text-ink-700 dark:text-ink-200">
+                                    <span className="font-semibold text-blue-600 dark:text-blue-400">{it.dNumber}</span>{" "}
+                                    — {it.name}
+                                  </span>
+                                  {bill.status === "priced" && (
+                                    <span className="tabular-nums font-medium text-ink-900 dark:text-white">
+                                      ₹{it.price.toLocaleString("en-IN")}
+                                    </span>
+                                  )}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
                         ))}
-                      </ul>
+                      </div>
                       {bill.note && (
                         <p className="mt-3 rounded-lg bg-ink-50 dark:bg-ink-950 px-3 py-2 text-xs text-ink-600 dark:text-ink-300">
                           {bill.note}
@@ -187,3 +213,4 @@ export default function DealerBills() {
     </div>
   );
 }
+
