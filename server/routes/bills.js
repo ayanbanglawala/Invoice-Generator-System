@@ -1,113 +1,137 @@
-import { Router } from "express";
-import Bill from "../models/Bill.js";
-import Parcel from "../models/Parcel.js";
-import { nextBillNumber } from "../lib/billCounter.js";
+const API_URL = import.meta.env.VITE_API_URL || "/api";
 
-const router = Router();
-
-async function linkParcelsToBill(items, billId) {
-  const parcelIds = items.map((it) => it.parcelId).filter(Boolean);
-  if (parcelIds.length === 0) return;
-  await Parcel.updateMany(
-    { _id: { $in: parcelIds } },
-    { $addToSet: { billedBillIds: billId } }
-  );
+async function request(path, options = {}) {
+  let res;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      headers: { "Content-Type": "application/json" },
+      ...options,
+    });
+  } catch {
+    throw new Error(
+      `Could not reach the API at ${API_URL}. Make sure the backend is running (or, on Vercel, that the deployment finished and MONGODB_URI is set).`
+    );
+  }
+  if (!res.ok) {
+    let message = `Request failed (${res.status})`;
+    try {
+      const body = await res.json();
+      if (body?.error) message = body.error;
+    } catch {
+      /* ignore parse errors */
+    }
+    throw new Error(message);
+  }
+  if (res.status === 204) return null;
+  return res.json();
 }
 
-// GET /api/bills — flat list, most recent first
-router.get("/", async (req, res) => {
-  const bills = await Bill.find().sort({ dateOfIssue: -1, createdAt: -1 });
-  res.json(bills);
-});
+// ---------- Customers ----------
+export function getCustomers() {
+  return request("/customers");
+}
 
-// GET /api/bills/grouped — bills bucketed by month (e.g. "January 2026"),
-// most recent month first, bills within a month most recent first.
-router.get("/grouped", async (req, res) => {
-  const groups = await Bill.aggregate([
-    { $sort: { dateOfIssue: -1, createdAt: -1 } },
-    {
-      $group: {
-        _id: { monthKey: "$monthKey", monthLabel: "$monthLabel" },
-        bills: { $push: "$$ROOT" },
-        totalAmount: { $sum: "$totalAmount" },
-        count: { $sum: 1 },
-      },
-    },
-    { $sort: { "_id.monthKey": -1 } },
-    {
-      $project: {
-        _id: 0,
-        monthKey: "$_id.monthKey",
-        monthLabel: "$_id.monthLabel",
-        bills: 1,
-        totalAmount: 1,
-        count: 1,
-      },
-    },
-  ]);
-  res.json(groups);
-});
+export function saveCustomer(customer) {
+  return request("/customers", {
+    method: "POST",
+    body: JSON.stringify(customer),
+  });
+}
 
-// GET /api/bills/next-number?series=AZ — atomically allocates and returns
-// the next bill number in that series, e.g. { billNo: "AZ:001" }.
-router.get("/next-number", async (req, res) => {
-  try {
-    const { series } = req.query;
-    if (!series || !series.trim()) {
-      return res.status(400).json({ error: "Series is required." });
-    }
-    const billNo = await nextBillNumber(series);
-    res.json({ billNo });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
+export function deleteCustomer(id) {
+  return request(`/customers/${id}`, { method: "DELETE" });
+}
 
-// GET /api/bills/:id
-router.get("/:id", async (req, res) => {
-  const bill = await Bill.findById(req.params.id);
-  if (!bill) return res.status(404).json({ error: "Bill not found." });
-  res.json(bill);
-});
+// ---------- Bills ----------
+export function getBills() {
+  return request("/bills");
+}
 
-// POST /api/bills
-router.post("/", async (req, res) => {
-  try {
-    const { billNo, customerId, customerName, customerPhone, dateOfIssue, items, note } =
-      req.body;
+// Returns [{ monthKey, monthLabel, bills, totalAmount, count }, ...]
+// most recent month first.
+export function getBillsGrouped() {
+  return request("/bills/grouped");
+}
 
-    if (!billNo || !billNo.trim()) {
-      return res.status(400).json({ error: "Bill number is required." });
-    }
-    if (!customerName || !customerName.trim()) {
-      return res.status(400).json({ error: "Customer is required." });
-    }
-    if (!Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ error: "At least one item is required." });
-    }
+export function getBill(id) {
+  return request(`/bills/${id}`);
+}
 
-    const bill = await Bill.create({
-      billNo: billNo.trim(),
-      customerId: customerId || null,
-      customerName: customerName.trim(),
-      customerPhone: (customerPhone || "").trim(),
-      dateOfIssue: new Date(dateOfIssue),
-      items,
-      note: (note || "").trim(),
-    });
+export function createBill(bill) {
+  return request("/bills", {
+    method: "POST",
+    body: JSON.stringify(bill),
+  });
+}
 
-    await linkParcelsToBill(items, bill._id);
+export function deleteBill(id) {
+  return request(`/bills/${id}`, { method: "DELETE" });
+}
 
-    res.status(201).json(bill);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
+export function computeTotals(items) {
+  const totalQty = (items || []).reduce((s, i) => s + Number(i.qty || 0), 0);
+  const totalAmount = (items || []).reduce(
+    (s, i) => s + Number(i.qty || 0) * Number(i.price || 0),
+    0
+  );
+  return { totalQty, totalAmount };
+}
 
-// DELETE /api/bills/:id
-router.delete("/:id", async (req, res) => {
-  await Bill.findByIdAndDelete(req.params.id);
-  res.status(204).end();
-});
+// ---------- Parcels (photo staging, pre-invoice) ----------
+export function getParcels() {
+  return request("/parcels");
+}
 
-export default router;
+export function createParcel(payload) {
+  return request("/parcels", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteParcel(id) {
+  return request(`/parcels/${id}`, { method: "DELETE" });
+}
+
+// ---------- Dealer Bills (parcel bundles sent to the dealer) ----------
+export function getDealerBills() {
+  return request("/dealer-bills");
+}
+
+export function getDealerBill(id) {
+  return request(`/dealer-bills/${id}`);
+}
+
+export function createDealerBill(payload) {
+  return request("/dealer-bills", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function priceDealerBill(id, payload) {
+  return request(`/dealer-bills/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateDealerBillItems(id, payload) {
+  return request(`/dealer-bills/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteDealerBill(id) {
+  return request(`/dealer-bills/${id}`, { method: "DELETE" });
+}
+
+// ---------- Reports (date-range export) ----------
+export function getReport({ from, to } = {}) {
+  const params = new URLSearchParams();
+  if (from) params.set("from", from);
+  if (to) params.set("to", to);
+  const qs = params.toString();
+  return request(`/reports${qs ? `?${qs}` : ""}`);
+}

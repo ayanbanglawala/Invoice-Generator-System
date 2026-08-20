@@ -130,12 +130,11 @@ export default function Parcels() {
     setShowDealerModal(true);
   }
 
-  async function handleCreateDealerBundle({ billNo, note }) {
+  async function handleCreateDealerBundle({ note }) {
     const eligibleIds = parcels
       .filter((p) => selectedIds.has(p._id) && !p.dealerBillId)
       .map((p) => p._id);
     const dealerBill = await store.createDealerBill({
-      billNo,
       note,
       parcelIds: eligibleIds,
     });
@@ -461,21 +460,16 @@ function ParcelGrid({ parcels, selectMode, selectedIds, onToggleSelect, onShare,
 }
 
 function DealerBundleModal({ count, onClose, onConfirm }) {
-  const [billNo, setBillNo] = useState("");
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!billNo.trim()) {
-      setError("Please enter a bill number (e.g. A:352).");
-      return;
-    }
     setSaving(true);
     setError("");
     try {
-      await onConfirm({ billNo: billNo.trim(), note: note.trim() });
+      await onConfirm({ note: note.trim() });
     } catch (err) {
       setError(err.message);
       setSaving(false);
@@ -502,22 +496,10 @@ function DealerBundleModal({ count, onClose, onConfirm }) {
 
         <p className="mb-4 rounded-xl bg-indigo-50 dark:bg-indigo-950 px-3.5 py-2.5 text-sm font-medium text-indigo-800 dark:text-indigo-200">
           {count} photo{count === 1 ? "" : "s"} selected — will be bundled together.
+          The bill number is generated automatically once you confirm.
         </p>
 
         <div className="space-y-4">
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-ink-700 dark:text-ink-200">
-              Bill Number
-            </label>
-            <input
-              autoFocus
-              value={billNo}
-              onChange={(e) => setBillNo(e.target.value)}
-              placeholder="e.g. A:352"
-              className="h-12 w-full rounded-xl border border-ink-200 dark:border-ink-700 px-4 text-base outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-              required
-            />
-          </div>
           <div>
             <label className="mb-1.5 block text-sm font-medium text-ink-700 dark:text-ink-200">
               Description (optional)

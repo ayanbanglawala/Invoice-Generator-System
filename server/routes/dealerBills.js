@@ -2,6 +2,12 @@ import { Router } from "express";
 import DealerBill from "../models/DealerBill.js";
 import Parcel from "../models/Parcel.js";
 import { applyDealerBillUpdate } from "../lib/dealerBillUpdate.js";
+import { nextBillNumber } from "../lib/billCounter.js";
+
+// Dealer bundles are always numbered in this series — matches your existing
+// A:212, A:213 style numbers, and continues forward from whatever the
+// highest existing A: number is the first time this runs (see billCounter.js).
+const DEALER_BILL_SERIES = "A";
 
 const router = Router();
 
@@ -11,14 +17,14 @@ router.get("/", async (req, res) => {
   res.json(bills);
 });
 
-// POST /api/dealer-bills — bundle selected parcels under a new A-number
+// POST /api/dealer-bills — bundle selected parcels under a new, auto
+// -generated A-number. The bill number is never taken from the client —
+// it's allocated here, atomically, the moment parcels are sent to the
+// dealer, so it can never collide or be skipped by mistake.
 router.post("/", async (req, res) => {
   try {
-    const { billNo, note, parcelIds } = req.body;
+    const { note, parcelIds } = req.body;
 
-    if (!billNo || !billNo.trim()) {
-      return res.status(400).json({ error: "Bill number is required." });
-    }
     if (!Array.isArray(parcelIds) || parcelIds.length === 0) {
       return res.status(400).json({ error: "Select at least one parcel photo." });
     }
@@ -45,8 +51,10 @@ router.post("/", async (req, res) => {
       price: 0,
     }));
 
+    const billNo = await nextBillNumber(DEALER_BILL_SERIES);
+
     const dealerBill = await DealerBill.create({
-      billNo: billNo.trim(),
+      billNo,
       note: (note || "").trim(),
       items,
     });

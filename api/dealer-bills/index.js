@@ -2,6 +2,12 @@ import connectDb from "../_db.js";
 import { applyCors } from "../_cors.js";
 import DealerBill from "../../server/models/DealerBill.js";
 import Parcel from "../../server/models/Parcel.js";
+import { nextBillNumber } from "../../server/lib/billCounter.js";
+
+// Dealer bundles are always numbered in this series — matches your existing
+// A:212, A:213 style numbers, and continues forward from whatever the
+// highest existing A: number is the first time this runs (see billCounter.js).
+const DEALER_BILL_SERIES = "A";
 
 export default async function handler(req, res) {
   if (applyCors(req, res)) return;
@@ -14,11 +20,8 @@ export default async function handler(req, res) {
 
   if (req.method === "POST") {
     try {
-      const { billNo, note, parcelIds } = req.body || {};
+      const { note, parcelIds } = req.body || {};
 
-      if (!billNo || !billNo.trim()) {
-        return res.status(400).json({ error: "Bill number is required." });
-      }
       if (!Array.isArray(parcelIds) || parcelIds.length === 0) {
         return res.status(400).json({ error: "Select at least one parcel photo." });
       }
@@ -40,12 +43,15 @@ export default async function handler(req, res) {
         parcelId: p._id,
         dNumber: p.dNumber,
         name: p.note,
+        ownerName: p.customerName,
         qty: 1,
         price: 0,
       }));
 
+      const billNo = await nextBillNumber(DEALER_BILL_SERIES);
+
       const dealerBill = await DealerBill.create({
-        billNo: billNo.trim(),
+        billNo,
         note: (note || "").trim(),
         items,
       });
