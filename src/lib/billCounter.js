@@ -1,5 +1,6 @@
 import Counter, { nextSequence } from "../models/Counter.js";
 import Bill from "../models/Bill.js";
+import DealerBill from "../models/DealerBill.js";
 
 // Series are 3-digit, zero-padded (AZ:001, AZ:002, ... AZ:999, then AZ:1000).
 // Old manually-typed numbers like "A:214" are untouched — this only governs
@@ -8,6 +9,13 @@ const PAD_WIDTH = 3;
 
 function counterKey(series) {
   return `billNo:${series}`;
+}
+
+function maxNumberInCollection(docs, prefix) {
+  return docs.reduce((m, d) => {
+    const n = parseInt(String(d.billNo || "").slice(prefix.length), 10);
+    return Number.isFinite(n) ? Math.max(m, n) : m;
+  }, 0);
 }
 
 // Allocates and RETURNS the next number for a series — this is not a
@@ -24,16 +32,20 @@ export async function nextBillNumber(series) {
   if (!exists) {
     // Bootstrap from the highest existing number in this exact series so
     // numbering continues forward instead of colliding with bills already
-    // created (manually or previously) under this prefix.
+    // created under this prefix. A given series can appear in either
+    // collection — a dealer bundle's own number lives in DealerBill, and a
+    // customer bill created from that bundle carries the same number into
+    // Bill — so check both and take the overall highest.
     const prefix = `${clean}:`;
-    const existing = await Bill.find(
-      { billNo: { $regex: `^${prefix}\\d+$` } },
-      { billNo: 1 }
-    ).lean();
-    const max = existing.reduce((m, b) => {
-      const n = parseInt(b.billNo.slice(prefix.length), 10);
-      return Number.isFinite(n) ? Math.max(m, n) : m;
-    }, 0);
+    const regex = { $regex: `^${prefix}\\d+$` };
+    const [bills, dealerBills] = await Promise.all([
+      Bill.find({ billNo: regex }, { billNo: 1 }).lean(),
+      DealerBill.find({ billNo: regex }, { billNo: 1 }).lean(),
+    ]);
+    const max = Math.max(
+      maxNumberInCollection(bills, prefix),
+      maxNumberInCollection(dealerBills, prefix)
+    );
     try {
       await Counter.create({ key, seq: max });
     } catch {

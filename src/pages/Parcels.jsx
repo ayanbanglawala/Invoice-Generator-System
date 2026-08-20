@@ -130,11 +130,12 @@ export default function Parcels() {
     setShowDealerModal(true);
   }
 
-  async function handleCreateDealerBundle({ note }) {
+  async function handleCreateDealerBundle({ series, note }) {
     const eligibleIds = parcels
       .filter((p) => selectedIds.has(p._id) && !p.dealerBillId)
       .map((p) => p._id);
     const dealerBill = await store.createDealerBill({
+      series,
       note,
       parcelIds: eligibleIds,
     });
@@ -459,7 +460,13 @@ function ParcelGrid({ parcels, selectMode, selectedIds, onToggleSelect, onShare,
   );
 }
 
+// Extend this list any time you want a new series available in the
+// dropdown — the counter for a brand-new series starts fresh from :001
+// automatically the first time it's used.
+const DEALER_BILL_SERIES_OPTIONS = ["AZ", "G"];
+
 function DealerBundleModal({ count, onClose, onConfirm }) {
+  const [series, setSeries] = useState(DEALER_BILL_SERIES_OPTIONS[0]);
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -469,7 +476,7 @@ function DealerBundleModal({ count, onClose, onConfirm }) {
     setSaving(true);
     setError("");
     try {
-      await onConfirm({ note: note.trim() });
+      await onConfirm({ series, note: note.trim() });
     } catch (err) {
       setError(err.message);
       setSaving(false);
@@ -500,6 +507,22 @@ function DealerBundleModal({ count, onClose, onConfirm }) {
         </p>
 
         <div className="space-y-4">
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-ink-700 dark:text-ink-200">
+              Bill Series
+            </label>
+            <select
+              value={series}
+              onChange={(e) => setSeries(e.target.value)}
+              className="h-12 w-full rounded-xl border border-ink-200 dark:border-ink-700 bg-white dark:bg-ink-900 px-4 text-base outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+            >
+              {DEALER_BILL_SERIES_OPTIONS.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </div>
           <div>
             <label className="mb-1.5 block text-sm font-medium text-ink-700 dark:text-ink-200">
               Description (optional)
