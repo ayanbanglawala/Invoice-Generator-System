@@ -44,6 +44,7 @@ export async function applyDealerBillUpdate(bill, payload) {
         parcelId: p._id,
         dNumber: p.dNumber,
         name: p.note,
+        ownerName: p.customerName,
         qty: 1,
         price: 0,
       }));
@@ -102,11 +103,16 @@ export async function applyDealerBillUpdate(bill, payload) {
   if (typeof note === "string") bill.note = note.trim();
   if (typeof billNo === "string" && billNo.trim()) bill.billNo = billNo.trim();
 
-  // Any item still at price 0 means it hasn't been priced yet — the bundle
-  // stays (or returns to) "packed" so the price-entry screen picks it back
-  // up. Once every item has a real price, it's "priced" — this must
-  // actually promote from "packed", not just preserve whatever the status
-  // happened to be before this update.
+  // Any item still at price 0 means it hasn't been priced yet — keep/return
+  // the bundle to "packed" so the price-entry screen picks it back up.
+  // If every item is priced AND this update actually went through the
+  // pricing flow (an `items` payload), promote to "priced". A composition
+  // -only edit (`parcelIds` with no `items`) never auto-jumps the status on
+  // its own — it just preserves whatever status the bundle already had.
   const hasUnpriced = bill.items.some((it) => Number(it.price) === 0);
-  bill.status = hasUnpriced ? "packed" : "priced";
+  if (hasUnpriced) {
+    bill.status = "packed";
+  } else if (Array.isArray(items)) {
+    bill.status = "priced";
+  }
 }
