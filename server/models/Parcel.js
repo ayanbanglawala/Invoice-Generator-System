@@ -25,5 +25,11 @@ const parcelSchema = new mongoose.Schema(
 );
 
 parcelSchema.index({ createdAt: -1 });
+// Powers: customer ledger lookups, "unbilled parcels" filtering in the
+// Send-to-Dealer picker, and the Home pending-payments grouping — all of
+// which previously scanned every parcel document to find matches.
+parcelSchema.index({ customerId: 1 });
+parcelSchema.index({ dealerBillId: 1 });
+parcelSchema.index({ billedBillIds: 1 });
 
 export default mongoose.model("Parcel", parcelSchema);

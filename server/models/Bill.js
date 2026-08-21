@@ -31,6 +31,9 @@ const billSchema = new mongoose.Schema(
 
 billSchema.index({ monthKey: -1, dateOfIssue: -1 });
 billSchema.index({ billNo: 1 });
+// Powers the Customer Ledger page, which looks up all bills for one
+// customer — was previously an unindexed scan of the whole Bill collection.
+billSchema.index({ customerId: 1, dateOfIssue: -1 });
 
 billSchema.pre("validate", function computeDerivedFields() {
   if (this.items?.length) {

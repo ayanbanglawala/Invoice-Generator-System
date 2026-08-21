@@ -45,5 +45,8 @@ dealerBillSchema.pre("validate", function computeTotals() {
 });
 
 dealerBillSchema.index({ createdAt: -1 });
+// Powers the "awaiting price" count on the Dealer tab header and any
+// status-based filtering there.
+dealerBillSchema.index({ status: 1, createdAt: -1 });
 
 export default mongoose.model("DealerBill", dealerBillSchema);

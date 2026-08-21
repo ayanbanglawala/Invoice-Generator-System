@@ -1,6 +1,40 @@
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 
+// A short-lived cache for GET requests only. This isn't meant to keep data
+// fresh for a long time — it's just there to make quick tab-switching (Home
+// -> Parcels -> Home) feel instant instead of re-fetching + re-rendering a
+// loading spinner every single time, since most of these lists don't
+// change second-to-second. Any create/update/delete call wipes the whole
+// cache, so you're never more than one write away from fresh data.
+const GET_CACHE_TTL_MS = 15000;
+const getCache = new Map(); // path -> { data, expiresAt }
+
+function cacheGet(path) {
+  const entry = getCache.get(path);
+  if (!entry) return undefined;
+  if (Date.now() > entry.expiresAt) {
+    getCache.delete(path);
+    return undefined;
+  }
+  return entry.data;
+}
+
+function cacheSet(path, data) {
+  getCache.set(path, { data, expiresAt: Date.now() + GET_CACHE_TTL_MS });
+}
+
+export function clearApiCache() {
+  getCache.clear();
+}
+
 async function request(path, options = {}) {
+  const method = (options.method || "GET").toUpperCase();
+
+  if (method === "GET") {
+    const cached = cacheGet(path);
+    if (cached !== undefined) return cached;
+  }
+
   let res;
   try {
     res = await fetch(`${API_URL}${path}`, {
@@ -22,8 +56,18 @@ async function request(path, options = {}) {
     }
     throw new Error(message);
   }
+
+  if (method !== "GET") {
+    // A write happened — anything we had cached could now be stale, so
+    // rather than tracking which exact resources it touched, just clear
+    // everything. Simple and always correct.
+    clearApiCache();
+  }
+
   if (res.status === 204) return null;
-  return res.json();
+  const data = await res.json();
+  if (method === "GET") cacheSet(path, data);
+  return data;
 }
 
 // ---------- Customers ----------

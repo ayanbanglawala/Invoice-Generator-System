@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import compression from "compression";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import customerRoutes from "./routes/customers.js";
@@ -12,6 +13,9 @@ dotenv.config();
 
 const app = express();
 app.use(cors());
+// Gzips every JSON response — parcel/bill lists can run to hundreds of KB
+// of JSON once there's real history, and this typically cuts that by 70-80%.
+app.use(compression());
 // Parcel photos arrive as base64 JSON — the default 100kb express.json()
 // limit is nowhere near enough for a compressed photo (~200-800kb typical).
 app.use(express.json({ limit: "15mb" }));

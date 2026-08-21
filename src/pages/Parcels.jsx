@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import * as store from "../lib/storage";
 import { fileToCompressedDataUrl, dataUrlToFile } from "../lib/image";
@@ -76,16 +76,16 @@ export default function Parcels() {
     setSelectedIds(new Set());
   }
 
-  function toggleSelected(id) {
+  const toggleSelected = useCallback((id) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
-  }
+  }, []);
 
-  async function handleDelete(id) {
+  const handleDelete = useCallback(async (id) => {
     if (!confirm("Delete this parcel photo permanently?")) return;
     try {
       await store.deleteParcel(id);
@@ -93,7 +93,8 @@ export default function Parcels() {
     } catch (err) {
       alert(err.message);
     }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleDeleteSelected() {
     const chosen = Array.from(selectedIds);
@@ -145,7 +146,7 @@ export default function Parcels() {
     navigate(`/dealer-bills/${dealerBill._id}`);
   }
 
-  async function handleShareOne(parcel) {
+  const handleShareOne = useCallback(async (parcel) => {
     try {
       const file = await parcelToFile(parcel);
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
@@ -162,7 +163,7 @@ export default function Parcels() {
     } catch (err) {
       if (err?.name !== "AbortError") alert("Could not share this photo.");
     }
-  }
+  }, []);
 
   async function handleShareSelected() {
     const chosen = parcels.filter((p) => selectedIds.has(p._id));
@@ -372,93 +373,116 @@ export default function Parcels() {
 function ParcelGrid({ parcels, selectMode, selectedIds, onToggleSelect, onShare, onDelete }) {
   return (
     <div className="grid grid-cols-2 gap-3">
-      {parcels.map((p) => {
-        const billedNumbers = (p.billedBillIds || []).map((b) => b.billNo).filter(Boolean);
-        const dealerNumber = p.dealerBillId?.billNo;
-        return (
-          <div
-            key={p._id}
-            onClick={() => selectMode && onToggleSelect(p._id)}
-            className={`overflow-hidden rounded-2xl border bg-white dark:bg-ink-900 shadow-card ${
-              selectMode ? "cursor-pointer" : ""
-            } ${
-              selectMode && selectedIds.has(p._id)
-                ? "border-brand-400 ring-2 ring-brand-200"
-                : "border-ink-100 dark:border-ink-800"
-            }`}
-          >
-            <div className="relative aspect-square w-full bg-ink-50 dark:bg-ink-950">
-              <img
-                src={p.imageUrl}
-                alt={p.note}
-                className="h-full w-full object-cover"
-                loading="lazy"
-              />
-              {selectMode && (
-                <div
-                  className={`absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full border-2 ${
-                    selectedIds.has(p._id)
-                      ? "border-brand-500 bg-brand-500 text-white"
-                      : "border-white bg-black/20 text-transparent"
-                  }`}
-                >
-                  <CheckIcon width={14} height={14} />
-                </div>
-              )}
-              <span className="absolute left-2 top-2 rounded-full bg-blue-600 px-2 py-0.5 text-xs font-extrabold text-white shadow">
-                {p.dNumber}
-              </span>
-              <div className="absolute bottom-2 left-2 flex flex-col items-start gap-1">
-                {billedNumbers.length > 0 && (
-                  <span className="rounded-full bg-green-600 px-2 py-0.5 text-[10px] font-bold text-white shadow">
-                    {billedNumbers.join(", ")}
-                  </span>
-                )}
-                {dealerNumber && (
-                  <span className="rounded-full bg-indigo-600 px-2 py-0.5 text-[10px] font-bold text-white shadow">
-                    {dealerNumber}
-                  </span>
-                )}
-              </div>
-            </div>
-            <div className="p-2.5">
-              <p className="truncate text-[13px] font-semibold text-ink-900 dark:text-white">
-                {p.customerName}
-              </p>
-              <p className="truncate text-xs text-ink-500 dark:text-ink-400">{p.note}</p>
-              <p className="mt-0.5 text-[10px] text-ink-400 dark:text-ink-500">
-                {formatDateTime(p.createdAt)}
-              </p>
-              {!selectMode && (
-                <div className="mt-2 flex gap-1.5">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onShare(p);
-                    }}
-                    className="flex h-8 flex-1 items-center justify-center gap-1 rounded-lg bg-brand-50 dark:bg-brand-950 text-xs font-semibold text-brand-700 dark:text-brand-300 active:scale-95"
-                  >
-                    <ShareIcon width={13} height={13} /> Share
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDelete(p._id);
-                    }}
-                    aria-label="Delete parcel"
-                    className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-400 dark:text-ink-500 active:bg-red-50 dark:bg-red-950 active:text-red-600 dark:text-red-400"
-                  >
-                    <TrashIcon width={14} height={14} />
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      })}
+      {parcels.map((p) => (
+        <ParcelCard
+          key={p._id}
+          parcel={p}
+          selectMode={selectMode}
+          selected={selectedIds.has(p._id)}
+          onToggleSelect={onToggleSelect}
+          onShare={onShare}
+          onDelete={onDelete}
+        />
+      ))}
     </div>
   );
 }
+
+// Memoized so tapping one card to select it doesn't force React to
+// re-render every other card in the grid (each of which has an <img> —
+// on a list of dozens of parcels this was previously the single biggest
+// source of jank when using select mode).
+const ParcelCard = memo(function ParcelCard({
+  parcel: p,
+  selectMode,
+  selected,
+  onToggleSelect,
+  onShare,
+  onDelete,
+}) {
+  const billedNumbers = (p.billedBillIds || []).map((b) => b.billNo).filter(Boolean);
+  const dealerNumber = p.dealerBillId?.billNo;
+  return (
+    <div
+      onClick={() => selectMode && onToggleSelect(p._id)}
+      className={`overflow-hidden rounded-2xl border bg-white dark:bg-ink-900 shadow-card ${
+        selectMode ? "cursor-pointer" : ""
+      } ${
+        selectMode && selected
+          ? "border-brand-400 ring-2 ring-brand-200"
+          : "border-ink-100 dark:border-ink-800"
+      }`}
+    >
+      <div className="relative aspect-square w-full bg-ink-50 dark:bg-ink-950">
+        <img
+          src={p.imageUrl}
+          alt={p.note}
+          className="h-full w-full object-cover"
+          loading="lazy"
+          decoding="async"
+        />
+        {selectMode && (
+          <div
+            className={`absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full border-2 ${
+              selected
+                ? "border-brand-500 bg-brand-500 text-white"
+                : "border-white bg-black/20 text-transparent"
+            }`}
+          >
+            <CheckIcon width={14} height={14} />
+          </div>
+        )}
+        <span className="absolute left-2 top-2 rounded-full bg-blue-600 px-2 py-0.5 text-xs font-extrabold text-white shadow">
+          {p.dNumber}
+        </span>
+        <div className="absolute bottom-2 left-2 flex flex-col items-start gap-1">
+          {billedNumbers.length > 0 && (
+            <span className="rounded-full bg-green-600 px-2 py-0.5 text-[10px] font-bold text-white shadow">
+              {billedNumbers.join(", ")}
+            </span>
+          )}
+          {dealerNumber && (
+            <span className="rounded-full bg-indigo-600 px-2 py-0.5 text-[10px] font-bold text-white shadow">
+              {dealerNumber}
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="p-2.5">
+        <p className="truncate text-[13px] font-semibold text-ink-900 dark:text-white">
+          {p.customerName}
+        </p>
+        <p className="truncate text-xs text-ink-500 dark:text-ink-400">{p.note}</p>
+        <p className="mt-0.5 text-[10px] text-ink-400 dark:text-ink-500">
+          {formatDateTime(p.createdAt)}
+        </p>
+        {!selectMode && (
+          <div className="mt-2 flex gap-1.5">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onShare(p);
+              }}
+              className="flex h-8 flex-1 items-center justify-center gap-1 rounded-lg bg-brand-50 dark:bg-brand-950 text-xs font-semibold text-brand-700 dark:text-brand-300 active:scale-95"
+            >
+              <ShareIcon width={13} height={13} /> Share
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(p._id);
+              }}
+              aria-label="Delete parcel"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-400 dark:text-ink-500 active:bg-red-50 dark:bg-red-950 active:text-red-600 dark:text-red-400"
+            >
+              <TrashIcon width={14} height={14} />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
 
 // Extend this list any time you want a new series available in the
 // dropdown — the counter for a brand-new series starts fresh from :001
