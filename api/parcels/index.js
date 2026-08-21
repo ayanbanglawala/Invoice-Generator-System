@@ -15,7 +15,28 @@ export default async function handler(req, res) {
   await connectDb();
 
   if (req.method === "GET") {
-    const parcels = await Parcel.find()
+    const { page, limit, customerId, customerName } = req.query;
+    const filter = {};
+    if (customerId && customerName) {
+      filter.$or = [{ customerId }, { customerName }];
+    } else if (customerId) {
+      filter.customerId = customerId;
+    }
+
+    if (page || limit) {
+      const pageNum = Math.max(1, parseInt(page, 10) || 1);
+      const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 24));
+      const parcels = await Parcel.find(filter)
+        .sort({ createdAt: -1 })
+        .skip((pageNum - 1) * limitNum)
+        .limit(limitNum + 1)
+        .populate("billedBillIds", "billNo")
+        .populate("dealerBillId", "billNo status");
+      const hasMore = parcels.length > limitNum;
+      return res.status(200).json({ parcels: parcels.slice(0, limitNum), page: pageNum, hasMore });
+    }
+
+    const parcels = await Parcel.find(filter)
       .sort({ createdAt: -1 })
       .populate("billedBillIds", "billNo")
       .populate("dealerBillId", "billNo status");

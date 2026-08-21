@@ -36,22 +36,26 @@ export default function CustomerLedger() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    Promise.all([store.getCustomers(), store.getBills(), store.getParcels()])
-      .then(([customers, allBills, allParcels]) => {
+    // Only the customer list is fetched in full here — it's small and
+    // bounded. Bills and parcels are filtered server-side (by customerId,
+    // falling back to customerName for older records created before
+    // customerId linking existed) instead of downloading the entire
+    // (ever-growing) history and filtering it in the browser.
+    store
+      .getCustomers()
+      .then((customers) => {
         if (cancelled) return;
         const c = customers.find((x) => x._id === id);
         setCustomer(c || null);
-        setBills(
-          allBills.filter(
-            (b) => b.customerId === id || (c && b.customerName === c.name)
-          )
+        const filter = { customerId: id, ...(c?.name ? { customerName: c.name } : {}) };
+        return Promise.all([store.getBills(filter), store.getParcels(filter)]).then(
+          ([allBills, allParcels]) => {
+            if (cancelled) return;
+            setBills(allBills);
+            setParcels(allParcels);
+            setError("");
+          }
         );
-        setParcels(
-          allParcels.filter(
-            (p) => p.customerId === id || (c && p.customerName === c.name)
-          )
-        );
-        setError("");
       })
       .catch((err) => !cancelled && setError(err.message))
       .finally(() => !cancelled && setLoading(false));

@@ -17,7 +17,30 @@ export default async function handler(req, res) {
   await connectDb();
 
   if (req.method === "GET") {
-    const bills = await Bill.find().sort({ dateOfIssue: -1, createdAt: -1 });
+    const { page, limit, customerId, customerName, q } = req.query;
+    const filter = {};
+    if (customerId && customerName) {
+      filter.$or = [{ customerId }, { customerName }];
+    } else if (customerId) {
+      filter.customerId = customerId;
+    }
+    if (q && q.trim()) {
+      const rx = new RegExp(q.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      filter.$or = [{ customerName: rx }, { billNo: rx }];
+    }
+
+    if (page || limit) {
+      const pageNum = Math.max(1, parseInt(page, 10) || 1);
+      const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+      const bills = await Bill.find(filter)
+        .sort({ dateOfIssue: -1, createdAt: -1 })
+        .skip((pageNum - 1) * limitNum)
+        .limit(limitNum + 1);
+      const hasMore = bills.length > limitNum;
+      return res.status(200).json({ bills: bills.slice(0, limitNum), page: pageNum, hasMore });
+    }
+
+    const bills = await Bill.find(filter).sort({ dateOfIssue: -1, createdAt: -1 });
     return res.status(200).json(bills);
   }
 
