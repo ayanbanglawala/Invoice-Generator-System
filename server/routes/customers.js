@@ -1,12 +1,36 @@
 import { Router } from "express";
 import Customer from "../models/Customer.js";
+import { parsePagination, pageResult, escapeRegex } from "../lib/pagination.js";
 
 const router = Router();
 
-// GET /api/customers
+// GET /api/customers?q=&page=&limit=
+// Backward-compatible default (no query params): full unfiltered list,
+// used by dropdown pickers elsewhere in the app (parcel capture, bill
+// creation, etc.) which need every customer available at once. Once q/
+// page is present: paginated + searched, used by the Customers tab list.
 router.get("/", async (req, res) => {
-  const customers = await Customer.find().sort({ name: 1 });
-  res.json(customers);
+  const { q, page } = req.query;
+  const usePagination = Boolean(q || page);
+
+  if (!usePagination) {
+    const customers = await Customer.find().sort({ name: 1 });
+    return res.json(customers);
+  }
+
+  const match = {};
+  if (q && q.trim()) {
+    const re = new RegExp(escapeRegex(q.trim()), "i");
+    match.$or = [{ name: re }, { phone: re }];
+  }
+
+  const { page: p, limit, skip } = parsePagination(req.query, { defaultLimit: 10, maxLimit: 30 });
+  const [items, total] = await Promise.all([
+    Customer.find(match).sort({ name: 1 }).skip(skip).limit(limit),
+    Customer.countDocuments(match),
+  ]);
+
+  res.json(pageResult({ items, page: p, limit, total }));
 });
 
 // POST /api/customers  (create or update — send _id to update)

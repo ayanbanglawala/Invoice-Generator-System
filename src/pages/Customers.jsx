@@ -1,12 +1,35 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import * as store from "../lib/storage";
-import { PlusIcon, TrashIcon, UsersIcon, XIcon, PhoneIcon, PencilIcon, ChevronRightIcon } from "../components/Icons";
+import { useInfiniteList } from "../lib/useInfiniteList";
+import {
+  PlusIcon,
+  TrashIcon,
+  UsersIcon,
+  XIcon,
+  PhoneIcon,
+  PencilIcon,
+  ChevronRightIcon,
+  SearchIcon,
+} from "../components/Icons";
+
+const PAGE_SIZE = 10;
+const SEARCH_DEBOUNCE_MS = 350;
+
+// Debounces a fast-changing value (search input) so we don't hit the API
+// on every keystroke — only once typing pauses for a moment.
+function useDebouncedValue(value, delayMs) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(id);
+  }, [value, delayMs]);
+  return debounced;
+}
 
 export default function Customers() {
-  const [customers, setCustomers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [query, setQuery] = useState("");
+  const debouncedQuery = useDebouncedValue(query, SEARCH_DEBOUNCE_MS);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [name, setName] = useState("");
@@ -14,21 +37,18 @@ export default function Customers() {
   const [address, setAddress] = useState("");
   const [saving, setSaving] = useState(false);
 
-  function loadCustomers() {
-    setLoading(true);
-    return store
-      .getCustomers()
-      .then((data) => {
-        setCustomers(data);
-        setError("");
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
-  }
-
-  useEffect(() => {
-    loadCustomers();
-  }, []);
+  const {
+    items: customers,
+    loading,
+    loadingMore,
+    error,
+    hasMore,
+    sentinelRef,
+    reload,
+  } = useInfiniteList(
+    (page) => store.getCustomers({ q: debouncedQuery.trim() || undefined, page, limit: PAGE_SIZE }),
+    [debouncedQuery]
+  );
 
   function resetForm() {
     setName("");
@@ -62,7 +82,7 @@ export default function Customers() {
         phone: phone.trim(),
         address: address.trim(),
       });
-      await loadCustomers();
+      reload();
       resetForm();
     } catch (err) {
       alert(err.message);
@@ -75,7 +95,7 @@ export default function Customers() {
     if (!confirm("Delete this customer? This won't affect past bills.")) return;
     try {
       await store.deleteCustomer(id);
-      await loadCustomers();
+      reload();
     } catch (err) {
       alert(err.message);
     }
@@ -83,14 +103,30 @@ export default function Customers() {
 
   return (
     <div className="min-h-dvh bg-ink-50 dark:bg-ink-950 pb-28">
-      <header className="flex items-center justify-between bg-white dark:bg-ink-900 px-5 pb-4 pt-6 shadow-card">
-        <h1 className="text-xl font-bold text-ink-900 dark:text-white">Customers</h1>
-        <button
-          onClick={openNew}
-          className="flex h-10 items-center gap-1.5 rounded-full bg-brand-500 px-4 text-sm font-semibold text-white shadow-card active:scale-95"
-        >
-          <PlusIcon width={18} height={18} /> Add
-        </button>
+      <header className="bg-white dark:bg-ink-900 px-5 pb-4 pt-6 shadow-card">
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-bold text-ink-900 dark:text-white">Customers</h1>
+          <button
+            onClick={openNew}
+            className="flex h-10 items-center gap-1.5 rounded-full bg-brand-500 px-4 text-sm font-semibold text-white shadow-card active:scale-95"
+          >
+            <PlusIcon width={18} height={18} /> Add
+          </button>
+        </div>
+
+        <div className="relative mt-4">
+          <SearchIcon
+            width={18}
+            height={18}
+            className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-400 dark:text-ink-500"
+          />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by name or phone"
+            className="h-11 w-full rounded-xl border border-ink-200 dark:border-ink-700 bg-white dark:bg-ink-900 pl-10 pr-4 text-sm text-ink-800 dark:text-ink-100 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+          />
+        </div>
       </header>
 
       <main className="px-5 pt-4">
@@ -115,52 +151,67 @@ export default function Customers() {
               <UsersIcon width={26} height={26} />
             </div>
             <p className="mt-4 text-[15px] font-semibold text-ink-800 dark:text-ink-100">
-              No customers yet
+              {query ? "No matching customers" : "No customers yet"}
             </p>
             <p className="mt-1 max-w-[220px] text-sm text-ink-500 dark:text-ink-400">
-              Add a customer so you can pick them quickly while billing.
+              {query
+                ? "Try a different search term."
+                : "Add a customer so you can pick them quickly while billing."}
             </p>
           </div>
         ) : (
-          <ul className="space-y-2.5">
-            {customers.map((c) => (
-              <li
-                key={c._id}
-                className="flex items-center gap-2 rounded-2xl border border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 p-2 pl-4 shadow-card"
-              >
-                <Link
-                  to={`/customers/${c._id}`}
-                  className="flex min-w-0 flex-1 items-center gap-2 py-2 text-left"
+          <>
+            <ul className="space-y-2.5">
+              {customers.map((c) => (
+                <li
+                  key={c._id}
+                  className="flex items-center gap-2 rounded-2xl border border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 p-2 pl-4 shadow-card"
                 >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[15px] font-semibold text-ink-900 dark:text-white">
-                      {c.name}
-                    </p>
-                    {c.phone && (
-                      <p className="mt-0.5 flex items-center gap-1.5 text-xs text-ink-500 dark:text-ink-400">
-                        <PhoneIcon width={12} height={12} /> {c.phone}
+                  <Link
+                    to={`/customers/${c._id}`}
+                    className="flex min-w-0 flex-1 items-center gap-2 py-2 text-left"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[15px] font-semibold text-ink-900 dark:text-white">
+                        {c.name}
                       </p>
-                    )}
-                  </div>
-                  <ChevronRightIcon width={16} height={16} className="shrink-0 text-ink-300" />
-                </Link>
-                <button
-                  onClick={() => openEdit(c)}
-                  aria-label={`Edit ${c.name}`}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-ink-400 dark:text-ink-500 transition-colors active:bg-ink-50 dark:bg-ink-950 active:text-ink-700 dark:text-ink-200"
-                >
-                  <PencilIcon width={17} height={17} />
-                </button>
-                <button
-                  onClick={() => handleDelete(c._id)}
-                  aria-label={`Delete ${c.name}`}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-ink-400 dark:text-ink-500 transition-colors active:bg-red-50 dark:bg-red-950 active:text-red-600 dark:text-red-400"
-                >
-                  <TrashIcon width={18} height={18} />
-                </button>
-              </li>
-            ))}
-          </ul>
+                      {c.phone && (
+                        <p className="mt-0.5 flex items-center gap-1.5 text-xs text-ink-500 dark:text-ink-400">
+                          <PhoneIcon width={12} height={12} /> {c.phone}
+                        </p>
+                      )}
+                    </div>
+                    <ChevronRightIcon width={16} height={16} className="shrink-0 text-ink-300" />
+                  </Link>
+                  <button
+                    onClick={() => openEdit(c)}
+                    aria-label={`Edit ${c.name}`}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-ink-400 dark:text-ink-500 transition-colors active:bg-ink-50 dark:bg-ink-950 active:text-ink-700 dark:text-ink-200"
+                  >
+                    <PencilIcon width={17} height={17} />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(c._id)}
+                    aria-label={`Delete ${c.name}`}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-ink-400 dark:text-ink-500 transition-colors active:bg-red-50 dark:bg-red-950 active:text-red-600 dark:text-red-400"
+                  >
+                    <TrashIcon width={18} height={18} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <div ref={sentinelRef} className="h-8" />
+            {loadingMore && (
+              <p className="py-3 text-center text-xs font-medium text-ink-400 dark:text-ink-500">
+                Loading more…
+              </p>
+            )}
+            {!hasMore && customers.length > 0 && (
+              <p className="py-3 text-center text-xs text-ink-300 dark:text-ink-600">
+                You've reached the end.
+              </p>
+            )}
+          </>
         )}
       </main>
 

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import * as store from "../lib/storage";
+import { useInfiniteList } from "../lib/useInfiniteList";
 import { fileToCompressedDataUrl, dataUrlToFile } from "../lib/image";
 import {
   PlusIcon,
@@ -14,6 +15,21 @@ import {
   CheckCircleIcon,
   ChevronDownIcon,
 } from "../components/Icons";
+
+// The Parcels tab's status filter. Two independent real-world states
+// (billed-to-customer, sent-to-dealer) collapsed into one dropdown for
+// simplicity — see PROJECT_OVERVIEW.md section 2.1 for why they're kept
+// as two separate tags in the first place.
+const STATUS_FILTERS = [
+  { value: "all", label: "All" },
+  { value: "pending", label: "Pending (not billed)" },
+  { value: "billed", label: "Billed" },
+  { value: "dealer", label: "Sent to dealer" },
+  { value: "no-dealer", label: "Not sent to dealer" },
+];
+
+const GROUP_PAGE_SIZE = 10;
+const ITEM_PAGE_SIZE = 10;
 
 function formatDateTime(iso) {
   const d = new Date(iso);
@@ -41,59 +57,73 @@ async function parcelToFile(parcel) {
 
 export default function Parcels() {
   const navigate = useNavigate();
-  const [parcels, setParcels] = useState([]);
   const [customers, setCustomers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const [showCapture, setShowCapture] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
+  // Keeps the actual parcel objects for whatever is currently selected, so
+  // Share/Delete/Send-to-Dealer can act on them without needing every
+  // group to be loaded at once — a parcel only needs to have been *seen*
+  // (its group opened) to be selectable.
+  const [selectedParcels, setSelectedParcels] = useState(new Map());
   const [sharingSelected, setSharingSelected] = useState(false);
   const [deletingSelected, setDeletingSelected] = useState(false);
   const [showDealerModal, setShowDealerModal] = useState(false);
-  const [openCustomer, setOpenCustomer] = useState(null);
+  const [openKey, setOpenKey] = useState(null);
+  // Bumped after any mutation (delete, capture, dealer-bundle create) to
+  // force every currently-loaded group's items to refetch from page 1.
+  const [refreshTick, setRefreshTick] = useState(0);
 
-  function loadParcels() {
-    setLoading(true);
-    return store
-      .getParcels()
-      .then((data) => {
-        setParcels(data);
-        setError("");
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
-  }
+  const {
+    items: groups,
+    loading,
+    loadingMore: loadingMoreGroups,
+    error,
+    hasMore: hasMoreGroups,
+    sentinelRef: groupsSentinelRef,
+  } = useInfiniteList(
+    (page) => store.getParcelGroups({ status: statusFilter, page, limit: GROUP_PAGE_SIZE }),
+    [statusFilter, refreshTick]
+  );
 
   useEffect(() => {
-    loadParcels();
     store.getCustomers().then(setCustomers).catch(() => {});
   }, []);
+
+  function bumpRefresh() {
+    setOpenKey(null);
+    setRefreshTick((v) => v + 1);
+  }
 
   function toggleSelectMode() {
     setSelectMode((v) => !v);
     setSelectedIds(new Set());
+    setSelectedParcels(new Map());
   }
 
-  const toggleSelected = useCallback((id) => {
+  const toggleSelected = useCallback((parcel) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(parcel._id)) next.delete(parcel._id);
+      else next.add(parcel._id);
+      return next;
+    });
+    setSelectedParcels((prev) => {
+      const next = new Map(prev);
+      if (next.has(parcel._id)) next.delete(parcel._id);
+      else next.set(parcel._id, parcel);
       return next;
     });
   }, []);
 
-  const handleDelete = useCallback(async (id) => {
+  const handleDelete = useCallback((id) => {
     if (!confirm("Delete this parcel photo permanently?")) return;
-    try {
-      await store.deleteParcel(id);
-      await loadParcels();
-    } catch (err) {
-      alert(err.message);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    store
+      .deleteParcel(id)
+      .then(bumpRefresh)
+      .catch((err) => alert(err.message));
   }, []);
 
   async function handleDeleteSelected() {
@@ -107,7 +137,8 @@ export default function Parcels() {
       await Promise.all(chosen.map((id) => store.deleteParcel(id)));
       setSelectMode(false);
       setSelectedIds(new Set());
-      await loadParcels();
+      setSelectedParcels(new Map());
+      bumpRefresh();
     } catch (err) {
       alert(err.message);
     } finally {
@@ -116,7 +147,7 @@ export default function Parcels() {
   }
 
   function handleOpenDealerModal() {
-    const chosen = parcels.filter((p) => selectedIds.has(p._id));
+    const chosen = Array.from(selectedParcels.values());
     const eligible = chosen.filter((p) => !p.dealerBillId);
     const skipped = chosen.length - eligible.length;
     if (eligible.length === 0) {
@@ -132,8 +163,8 @@ export default function Parcels() {
   }
 
   async function handleCreateDealerBundle({ series, note }) {
-    const eligibleIds = parcels
-      .filter((p) => selectedIds.has(p._id) && !p.dealerBillId)
+    const eligibleIds = Array.from(selectedParcels.values())
+      .filter((p) => !p.dealerBillId)
       .map((p) => p._id);
     const dealerBill = await store.createDealerBill({
       series,
@@ -143,6 +174,7 @@ export default function Parcels() {
     setShowDealerModal(false);
     setSelectMode(false);
     setSelectedIds(new Set());
+    setSelectedParcels(new Map());
     navigate(`/dealer-bills/${dealerBill._id}`);
   }
 
@@ -166,7 +198,7 @@ export default function Parcels() {
   }, []);
 
   async function handleShareSelected() {
-    const chosen = parcels.filter((p) => selectedIds.has(p._id));
+    const chosen = Array.from(selectedParcels.values());
     if (chosen.length === 0) return;
     setSharingSelected(true);
     try {
@@ -188,6 +220,7 @@ export default function Parcels() {
       }
       setSelectMode(false);
       setSelectedIds(new Set());
+      setSelectedParcels(new Map());
     } catch (err) {
       if (err?.name !== "AbortError") alert("Could not share the selected photos.");
     } finally {
@@ -195,46 +228,50 @@ export default function Parcels() {
     }
   }
 
-  const pendingCount = parcels.filter((p) => !p.billedBillIds?.length).length;
-  const billedCount = parcels.length - pendingCount;
-
-  // Group by customer, most recently active customer first.
-  const groupMap = new Map();
-  for (const p of parcels) {
-    const key = p.customerId || p.customerName;
-    if (!groupMap.has(key)) {
-      groupMap.set(key, { key, customerName: p.customerName, parcels: [] });
-    }
-    groupMap.get(key).parcels.push(p);
-  }
-  const customerGroups = Array.from(groupMap.values()).sort(
-    (a, b) => new Date(b.parcels[0].createdAt) - new Date(a.parcels[0].createdAt)
-  );
-
   return (
     <div className="min-h-dvh bg-ink-50 dark:bg-ink-950 pb-28">
-      <header className="flex items-center justify-between bg-white dark:bg-ink-900 px-5 pb-4 pt-6 shadow-card">
-        <div>
-          <h1 className="text-xl font-bold text-ink-900 dark:text-white">Parcels</h1>
-          <p className="mt-0.5 text-sm text-ink-500 dark:text-ink-400">
-            {pendingCount} pending · {billedCount} billed
-          </p>
+      <header className="bg-white dark:bg-ink-900 px-5 pb-4 pt-6 shadow-card">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-ink-900 dark:text-white">Parcels</h1>
+            <p className="mt-0.5 text-sm text-ink-500 dark:text-ink-400">
+              Grouped by customer · loaded as you scroll
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={toggleSelectMode}
+              className={`h-10 rounded-full px-3.5 text-sm font-semibold transition-colors ${
+                selectMode ? "bg-ink-900 text-white" : "bg-ink-50 dark:bg-ink-950 text-ink-600 dark:text-ink-300"
+              }`}
+            >
+              {selectMode ? "Cancel" : "Select"}
+            </button>
+            <button
+              onClick={() => setShowCapture(true)}
+              className="flex h-10 items-center gap-1.5 rounded-full bg-brand-500 px-4 text-sm font-semibold text-white shadow-card active:scale-95"
+            >
+              <PlusIcon width={18} height={18} /> Photo
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={toggleSelectMode}
-            className={`h-10 rounded-full px-3.5 text-sm font-semibold transition-colors ${
-              selectMode ? "bg-ink-900 text-white" : "bg-ink-50 dark:bg-ink-950 text-ink-600 dark:text-ink-300"
-            }`}
-          >
-            {selectMode ? "Cancel" : "Select"}
-          </button>
-          <button
-            onClick={() => setShowCapture(true)}
-            className="flex h-10 items-center gap-1.5 rounded-full bg-brand-500 px-4 text-sm font-semibold text-white shadow-card active:scale-95"
-          >
-            <PlusIcon width={18} height={18} /> Photo
-          </button>
+
+        {/* Status filter — reloads the customer list from the server,
+            filtered, and collapses every open group back closed. */}
+        <div className="mt-3 -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5">
+          {STATUS_FILTERS.map((f) => (
+            <button
+              key={f.value}
+              onClick={() => setStatusFilter(f.value)}
+              className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+                statusFilter === f.value
+                  ? "bg-brand-500 text-white"
+                  : "bg-ink-50 dark:bg-ink-950 text-ink-600 dark:text-ink-300"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
         </div>
       </header>
 
@@ -246,75 +283,58 @@ export default function Parcels() {
         )}
 
         {loading ? (
-          <div className="grid grid-cols-2 gap-3">
-            {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="h-40 animate-pulse rounded-2xl bg-white dark:bg-ink-900 shadow-card" />
+          <div className="space-y-3">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="h-16 animate-pulse rounded-2xl bg-white dark:bg-ink-900 shadow-card" />
             ))}
           </div>
-        ) : parcels.length === 0 ? (
+        ) : groups.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-ink-200 dark:border-ink-700 bg-white dark:bg-ink-900 px-6 py-14 text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-50 dark:bg-brand-950 text-brand-500">
               <PackageIcon width={26} height={26} />
             </div>
             <p className="mt-4 text-[15px] font-semibold text-ink-800 dark:text-ink-100">
-              No parcels yet
+              {statusFilter === "all" ? "No parcels yet" : "No parcels match this filter"}
             </p>
             <p className="mt-1 max-w-[220px] text-sm text-ink-500 dark:text-ink-400">
-              Tap "Photo" to snap a parcel and tag it to a customer.
+              {statusFilter === "all"
+                ? 'Tap "Photo" to snap a parcel and tag it to a customer.'
+                : "Try a different status filter."}
             </p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {customerGroups.map((group) => {
-              const isOpen = openCustomer === group.key || selectMode;
-              const groupPending = group.parcels.filter((p) => !p.billedBillIds?.length).length;
-              return (
-                <section
+          <>
+            <div className="space-y-3">
+              {groups.map((group) => (
+                <CustomerGroupSection
                   key={group.key}
-                  className="overflow-hidden rounded-2xl border border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 shadow-card"
-                >
-                  <button
-                    onClick={() => setOpenCustomer(isOpen && !selectMode ? null : group.key)}
-                    className="flex w-full items-center justify-between px-4 py-3.5"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-[15px] font-bold text-ink-900 dark:text-white">
-                        {group.customerName}
-                      </span>
-                      <span className="rounded-full bg-ink-50 dark:bg-ink-950 px-2 py-0.5 text-xs font-semibold text-ink-500 dark:text-ink-400">
-                        {group.parcels.length}
-                      </span>
-                      {groupPending > 0 && (
-                        <span className="rounded-full bg-amber-50 dark:bg-amber-950 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-300">
-                          {groupPending} pending
-                        </span>
-                      )}
-                    </div>
-                    <ChevronDownIcon
-                      width={18}
-                      height={18}
-                      className={`text-ink-300 transition-transform ${
-                        isOpen ? "rotate-180" : ""
-                      }`}
-                    />
-                  </button>
-
-                  {isOpen && (
-                    <div className="border-t border-ink-100 dark:border-ink-800 p-3">
-                      <ParcelGrid
-                        parcels={group.parcels}
-                        selectMode={selectMode}
-                        selectedIds={selectedIds}
-                        onToggleSelect={toggleSelected}
-                        onShare={handleShareOne}
-                        onDelete={handleDelete}
-                      />
-                    </div>
-                  )}
-                </section>
-              );
-            })}
-          </div>
+                  group={group}
+                  isOpen={openKey === group.key || selectMode}
+                  onToggle={() => setOpenKey(openKey === group.key && !selectMode ? null : group.key)}
+                  statusFilter={statusFilter}
+                  refreshTick={refreshTick}
+                  selectMode={selectMode}
+                  selectedIds={selectedIds}
+                  onToggleSelect={toggleSelected}
+                  onShare={handleShareOne}
+                  onDelete={handleDelete}
+                />
+              ))}
+            </div>
+            {/* Sentinel — loads the next 10 customer groups when it
+                scrolls into view. */}
+            <div ref={groupsSentinelRef} className="h-8" />
+            {loadingMoreGroups && (
+              <p className="py-3 text-center text-xs font-medium text-ink-400 dark:text-ink-500">
+                Loading more customers…
+              </p>
+            )}
+            {!hasMoreGroups && groups.length > 0 && (
+              <p className="py-3 text-center text-xs text-ink-300 dark:text-ink-600">
+                You've reached the end.
+              </p>
+            )}
+          </>
         )}
       </main>
 
@@ -351,9 +371,7 @@ export default function Parcels() {
 
       {showDealerModal && (
         <DealerBundleModal
-          count={
-            parcels.filter((p) => selectedIds.has(p._id) && !p.dealerBillId).length
-          }
+          count={Array.from(selectedParcels.values()).filter((p) => !p.dealerBillId).length}
           onClose={() => setShowDealerModal(false)}
           onConfirm={handleCreateDealerBundle}
         />
@@ -363,10 +381,165 @@ export default function Parcels() {
         <CaptureSheet
           customers={customers}
           onClose={() => setShowCapture(false)}
-          onSaved={loadParcels}
+          onSaved={bumpRefresh}
         />
       )}
     </div>
+  );
+}
+
+// One customer's accordion row. Only fetches that customer's parcels (10
+// at a time) once it's opened for the first time — closing it keeps
+// what's already loaded in memory so re-opening is instant, but nothing
+// is fetched before the first open.
+function CustomerGroupSection({
+  group,
+  isOpen,
+  onToggle,
+  statusFilter,
+  refreshTick,
+  selectMode,
+  selectedIds,
+  onToggleSelect,
+  onShare,
+  onDelete,
+}) {
+  const [items, setItems] = useState([]);
+  const [page, setPage] = useState(0); // 0 = not loaded yet
+  const [hasMore, setHasMore] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState("");
+  const sentinelRef = useRef(null);
+  const loadingRef = useRef(false);
+
+  const fetchPage = useCallback(
+    (pageNum) =>
+      store.getParcels({
+        customerId: group.customerId || undefined,
+        status: statusFilter,
+        page: pageNum,
+        limit: ITEM_PAGE_SIZE,
+      }),
+    [group.customerId, statusFilter]
+  );
+
+  // Load (or reload) page 1 the first time this group opens, and whenever
+  // an outside mutation (delete/capture/dealer-bundle) bumps refreshTick.
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    setLoading(true);
+    setError("");
+    loadingRef.current = true;
+    fetchPage(1)
+      .then((res) => {
+        if (cancelled) return;
+        setItems(res.items || []);
+        setHasMore(!!res.hasMore);
+        setPage(1);
+      })
+      .catch((err) => !cancelled && setError(err.message))
+      .finally(() => {
+        if (cancelled) return;
+        setLoading(false);
+        loadingRef.current = false;
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, fetchPage, refreshTick]);
+
+  const loadMore = useCallback(() => {
+    if (loadingRef.current || !hasMore || page === 0) return;
+    loadingRef.current = true;
+    setLoadingMore(true);
+    const next = page + 1;
+    fetchPage(next)
+      .then((res) => {
+        setItems((prev) => [...prev, ...(res.items || [])]);
+        setHasMore(!!res.hasMore);
+        setPage(next);
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => {
+        setLoadingMore(false);
+        loadingRef.current = false;
+      });
+  }, [fetchPage, hasMore, page]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const node = sentinelRef.current;
+    if (!node) return undefined;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) loadMore();
+      },
+      { rootMargin: "150px" }
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [isOpen, loadMore]);
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 shadow-card">
+      <button onClick={onToggle} className="flex w-full items-center justify-between px-4 py-3.5">
+        <div className="flex items-center gap-2">
+          <span className="text-[15px] font-bold text-ink-900 dark:text-white">
+            {group.customerName}
+          </span>
+          <span className="rounded-full bg-ink-50 dark:bg-ink-950 px-2 py-0.5 text-xs font-semibold text-ink-500 dark:text-ink-400">
+            {group.totalCount}
+          </span>
+          {group.pendingCount > 0 && (
+            <span className="rounded-full bg-amber-50 dark:bg-amber-950 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-300">
+              {group.pendingCount} pending
+            </span>
+          )}
+        </div>
+        <ChevronDownIcon
+          width={18}
+          height={18}
+          className={`text-ink-300 transition-transform ${isOpen ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {isOpen && (
+        <div className="border-t border-ink-100 dark:border-ink-800 p-3">
+          {error && (
+            <p className="mb-2 text-xs font-medium text-red-600 dark:text-red-400">{error}</p>
+          )}
+          {loading ? (
+            <div className="grid grid-cols-2 gap-3">
+              {[0, 1].map((i) => (
+                <div key={i} className="h-40 animate-pulse rounded-2xl bg-ink-50 dark:bg-ink-950" />
+              ))}
+            </div>
+          ) : (
+            <>
+              <ParcelGrid
+                parcels={items}
+                selectMode={selectMode}
+                selectedIds={selectedIds}
+                onToggleSelect={onToggleSelect}
+                onShare={onShare}
+                onDelete={onDelete}
+              />
+              {/* Sentinel — loads this customer's next 10 photos when it
+                  scrolls into view. */}
+              <div ref={sentinelRef} className="h-4" />
+              {loadingMore && (
+                <p className="py-2 text-center text-xs font-medium text-ink-400 dark:text-ink-500">
+                  Loading more photos…
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -404,7 +577,7 @@ const ParcelCard = memo(function ParcelCard({
   const dealerNumber = p.dealerBillId?.billNo;
   return (
     <div
-      onClick={() => selectMode && onToggleSelect(p._id)}
+      onClick={() => selectMode && onToggleSelect(p)}
       className={`overflow-hidden rounded-2xl border bg-white dark:bg-ink-900 shadow-card ${
         selectMode ? "cursor-pointer" : ""
       } ${

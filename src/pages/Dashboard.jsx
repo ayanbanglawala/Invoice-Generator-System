@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import * as store from "../lib/storage";
 import { useAuth } from "../context/AuthContext";
+import { useInfiniteList } from "../lib/useInfiniteList";
 import {
   LogoutIcon,
   SearchIcon,
@@ -9,6 +10,10 @@ import {
   ReceiptIcon,
   SettingsIcon,
 } from "../components/Icons";
+
+const MONTH_PAGE_SIZE = 12;
+const BILL_PAGE_SIZE = 10;
+const SEARCH_DEBOUNCE_MS = 350;
 
 function formatDate(iso) {
   const d = new Date(iso);
@@ -36,34 +41,77 @@ function groupPiecesByDealerBill(pieces) {
   return groups;
 }
 
+// Debounces a fast-changing value (search input) so we don't hit the API
+// on every keystroke — only once typing pauses for a moment.
+function useDebouncedValue(value, delayMs) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(id);
+  }, [value, delayMs]);
+  return debounced;
+}
+
 export default function Dashboard() {
   const { signOut } = useAuth();
   const [query, setQuery] = useState("");
-  const [groups, setGroups] = useState([]);
+  const debouncedQuery = useDebouncedValue(query, SEARCH_DEBOUNCE_MS);
   const [parcels, setParcels] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [parcelsLoading, setParcelsLoading] = useState(true);
+  const [parcelsError, setParcelsError] = useState("");
   const [openMonth, setOpenMonth] = useState(null);
   const [openPendingCustomer, setOpenPendingCustomer] = useState(null);
   const [showPending, setShowPending] = useState(true);
 
+  // Pending Payments still needs every unbilled, dealer-priced parcel to
+  // compute totals per customer — a small, bounded set in practice (it
+  // shrinks the moment a bill is created), so it's fetched in full rather
+  // than paginated.
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    Promise.all([store.getBillsGrouped(), store.getParcels()])
-      .then(([billGroups, parcelList]) => {
-        if (cancelled) return;
-        setGroups(billGroups);
-        setParcels(parcelList);
-        setOpenMonth(billGroups[0]?.monthKey ?? null);
-        setError("");
-      })
-      .catch((err) => !cancelled && setError(err.message))
-      .finally(() => !cancelled && setLoading(false));
+    setParcelsLoading(true);
+    store
+      .getParcels()
+      .then((data) => !cancelled && setParcels(data))
+      .catch((err) => !cancelled && setParcelsError(err.message))
+      .finally(() => !cancelled && setParcelsLoading(false));
     return () => {
       cancelled = true;
     };
   }, []);
+
+  // Month summaries — counts/totals only, no bill documents. Loaded 12 at
+  // a time (a year's worth) and lazily extended if there's more history.
+  const {
+    items: monthGroups,
+    loading: monthsLoading,
+    loadingMore: loadingMoreMonths,
+    error: monthsError,
+    hasMore: hasMoreMonths,
+    sentinelRef: monthsSentinelRef,
+  } = useInfiniteList(
+    (page) => store.getBillsGrouped({ page, limit: MONTH_PAGE_SIZE }),
+    []
+  );
+
+  // Search — once the person types something, we stop browsing by month
+  // and instead show a flat, paginated list of matching bills straight
+  // from the server (since not every bill is loaded on the client anymore).
+  const isSearching = debouncedQuery.trim().length > 0;
+  const {
+    items: searchResults,
+    loading: searchLoading,
+    loadingMore: loadingMoreSearch,
+    error: searchError,
+    hasMore: hasMoreSearch,
+    sentinelRef: searchSentinelRef,
+  } = useInfiniteList(
+    (page) =>
+      isSearching
+        ? store.getBills({ q: debouncedQuery.trim(), page, limit: BILL_PAGE_SIZE })
+        : Promise.resolve({ items: [], hasMore: false }),
+    [isSearching, debouncedQuery]
+  );
 
   const pendingPaymentGroups = useMemo(() => {
     const eligible = parcels.filter(
@@ -86,25 +134,9 @@ export default function Dashboard() {
   }, [parcels]);
 
   const totalPendingAmount = pendingPaymentGroups.reduce((s, g) => s + g.totalPending, 0);
-  const totalPendingPieces = pendingPaymentGroups.reduce((s, g) => s + g.pieces.length, 0);
 
-  const filteredGroups = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return groups;
-    return groups
-      .map((g) => ({
-        ...g,
-        bills: g.bills.filter(
-          (b) =>
-            b.customerName?.toLowerCase().includes(q) ||
-            b.billNo?.toLowerCase().includes(q)
-        ),
-      }))
-      .filter((g) => g.bills.length > 0);
-  }, [groups, query]);
-
-  const totalInvoices = groups.reduce((s, g) => s + g.count, 0);
-  const totalRevenue = groups.reduce((s, g) => s + g.totalAmount, 0);
+  const totalInvoices = monthGroups.reduce((s, g) => s + g.count, 0);
+  const totalRevenue = monthGroups.reduce((s, g) => s + g.totalAmount, 0);
 
   return (
     <div className="min-h-dvh bg-ink-50 dark:bg-ink-950 pb-28">
@@ -137,12 +169,14 @@ export default function Dashboard() {
             <p className="text-[11px] font-medium text-brand-700 dark:text-brand-300">Invoices</p>
             <p className="mt-1 text-base font-bold text-brand-900 dark:text-brand-100">
               {totalInvoices}
+              {hasMoreMonths ? "+" : ""}
             </p>
           </div>
           <div className="rounded-xl bg-ink-50 dark:bg-ink-950 p-3">
             <p className="text-[11px] font-medium text-ink-500 dark:text-ink-400">Billed</p>
             <p className="mt-1 text-base font-bold text-ink-900 dark:text-white tabular-nums">
               ₹{totalRevenue.toLocaleString("en-IN")}
+              {hasMoreMonths ? "+" : ""}
             </p>
           </div>
           <div className="rounded-xl bg-amber-50 dark:bg-amber-950 p-3">
@@ -169,13 +203,13 @@ export default function Dashboard() {
       </header>
 
       <main className="px-5 pt-4">
-        {error && (
+        {(monthsError || searchError) && (
           <div className="mb-3 rounded-xl border border-red-100 dark:border-red-900 bg-red-50 dark:bg-red-950 px-4 py-3 text-sm text-red-700 dark:text-red-300">
-            Could not load bills: {error}. Is the API server running?
+            Could not load bills: {monthsError || searchError}. Is the API server running?
           </div>
         )}
 
-        {!loading && pendingPaymentGroups.length > 0 && (
+        {!parcelsLoading && !parcelsError && !isSearching && pendingPaymentGroups.length > 0 && (
           <section className="mb-5 overflow-hidden rounded-2xl border border-amber-200 dark:border-amber-800 bg-amber-50/50 shadow-card">
             <button
               onClick={() => setShowPending((v) => !v)}
@@ -185,27 +219,19 @@ export default function Dashboard() {
                 <p className="text-[15px] font-bold text-amber-900 dark:text-amber-100">
                   Pending Payments
                 </p>
-                <p className="mt-0.5 text-xs font-medium text-amber-700 dark:text-amber-300">
-                  {totalPendingPieces} piece{totalPendingPieces === 1 ? "" : "s"} priced by
-                  dealer, not yet billed to customer
+                <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-300">
+                  Known dealer cost, not yet billed to the customer
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="tabular-nums text-sm font-extrabold text-amber-900 dark:text-amber-100">
-                  ₹{totalPendingAmount.toLocaleString("en-IN")}
-                </span>
-                <ChevronRightIcon
-                  width={16}
-                  height={16}
-                  className={`text-amber-500 transition-transform ${
-                    showPending ? "rotate-90" : ""
-                  }`}
-                />
-              </div>
+              <ChevronRightIcon
+                width={16}
+                height={16}
+                className={`text-amber-400 transition-transform ${showPending ? "rotate-90" : ""}`}
+              />
             </button>
 
             {showPending && (
-              <div className="space-y-2 border-t border-amber-200 dark:border-amber-800 p-3">
+              <div className="space-y-2 border-t border-amber-100 dark:border-amber-900 p-3">
                 {pendingPaymentGroups.map((group) => {
                   const isOpen = openPendingCustomer === group.key;
                   return (
@@ -214,10 +240,8 @@ export default function Dashboard() {
                       className="overflow-hidden rounded-xl border border-amber-100 dark:border-amber-900 bg-white dark:bg-ink-900"
                     >
                       <button
-                        onClick={() =>
-                          setOpenPendingCustomer(isOpen ? null : group.key)
-                        }
-                        className="flex w-full items-center justify-between px-3 py-2.5"
+                        onClick={() => setOpenPendingCustomer(isOpen ? null : group.key)}
+                        className="flex w-full items-center justify-between px-3.5 py-3"
                       >
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-semibold text-ink-900 dark:text-white">
@@ -288,88 +312,212 @@ export default function Dashboard() {
           </section>
         )}
 
-        {loading ? (
+        {isSearching ? (
+          <>
+            {searchLoading ? (
+              <LoadingState />
+            ) : searchResults.length === 0 ? (
+              <EmptyState hasQuery />
+            ) : (
+              <ul className="space-y-2">
+                {searchResults.map((bill) => (
+                  <BillRow key={bill._id} bill={bill} />
+                ))}
+              </ul>
+            )}
+            <div ref={searchSentinelRef} className="h-8" />
+            {loadingMoreSearch && (
+              <p className="py-3 text-center text-xs font-medium text-ink-400 dark:text-ink-500">
+                Loading more results…
+              </p>
+            )}
+            {!hasMoreSearch && searchResults.length > 0 && (
+              <p className="py-3 text-center text-xs text-ink-300 dark:text-ink-600">
+                You've reached the end.
+              </p>
+            )}
+          </>
+        ) : monthsLoading ? (
           <LoadingState />
-        ) : filteredGroups.length === 0 ? (
-          <EmptyState hasQuery={!!query} />
+        ) : monthGroups.length === 0 ? (
+          <EmptyState hasQuery={false} />
         ) : (
-          <div className="space-y-4">
-            {filteredGroups.map((group) => {
-              const isOpen = openMonth === group.monthKey || !!query;
-              return (
-                <section
+          <>
+            <div className="space-y-4">
+              {monthGroups.map((group) => (
+                <MonthSection
                   key={group.monthKey}
-                  className="overflow-hidden rounded-2xl border border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 shadow-card"
-                >
-                  <button
-                    onClick={() =>
-                      setOpenMonth(isOpen && !query ? null : group.monthKey)
-                    }
-                    className="flex w-full items-center justify-between px-4 py-3.5"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-[15px] font-bold text-ink-900 dark:text-white">
-                        {group.monthLabel}
-                      </span>
-                      <span className="rounded-full bg-ink-50 dark:bg-ink-950 px-2 py-0.5 text-xs font-semibold text-ink-500 dark:text-ink-400">
-                        {group.count}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="tabular-nums text-sm font-semibold text-ink-700 dark:text-ink-200">
-                        ₹{group.totalAmount.toLocaleString("en-IN")}
-                      </span>
-                      <ChevronRightIcon
-                        width={16}
-                        height={16}
-                        className={`text-ink-300 transition-transform ${
-                          isOpen ? "rotate-90" : ""
-                        }`}
-                      />
-                    </div>
-                  </button>
-
-                  {isOpen && (
-                    <ul className="space-y-2 border-t border-ink-100 dark:border-ink-800 p-3">
-                      {group.bills.map((bill) => (
-                        <li key={bill._id}>
-                          <Link
-                            to={`/bills/${bill._id}`}
-                            className="flex items-center justify-between gap-3 rounded-xl bg-ink-50/60 p-3 transition-transform active:scale-[0.99]"
-                          >
-                            <div className="min-w-0">
-                              <p className="truncate text-[15px] font-semibold text-ink-900 dark:text-white">
-                                {bill.customerName}
-                              </p>
-                              <p className="mt-0.5 text-xs font-medium text-ink-500 dark:text-ink-400">
-                                {formatDate(bill.dateOfIssue)}
-                              </p>
-                              <p className="mt-0.5 text-base font-extrabold text-red-600 dark:text-red-400">
-                                {bill.billNo}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="tabular-nums text-[15px] font-bold text-ink-900 dark:text-white">
-                                ₹{bill.totalAmount.toLocaleString("en-IN")}
-                              </span>
-                              <ChevronRightIcon
-                                width={18}
-                                height={18}
-                                className="text-ink-300"
-                              />
-                            </div>
-                          </Link>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </section>
-              );
-            })}
-          </div>
+                  group={group}
+                  isOpen={openMonth === group.monthKey}
+                  onToggle={() => setOpenMonth(openMonth === group.monthKey ? null : group.monthKey)}
+                />
+              ))}
+            </div>
+            <div ref={monthsSentinelRef} className="h-8" />
+            {loadingMoreMonths && (
+              <p className="py-3 text-center text-xs font-medium text-ink-400 dark:text-ink-500">
+                Loading more months…
+              </p>
+            )}
+          </>
         )}
       </main>
     </div>
+  );
+}
+
+// One month's accordion row — fetches that month's bills (10 at a time)
+// only once opened, instead of every bill for every month loading up front.
+function MonthSection({ group, isOpen, onToggle }) {
+  const [items, setItems] = useState([]);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState("");
+  const sentinelRef = useRef(null);
+  const loadingRef = useRef(false);
+
+  const fetchPage = useCallback(
+    (pageNum) => store.getBills({ monthKey: group.monthKey, page: pageNum, limit: BILL_PAGE_SIZE }),
+    [group.monthKey]
+  );
+
+  useEffect(() => {
+    if (!isOpen || page !== 0) return;
+    let cancelled = false;
+    setLoading(true);
+    loadingRef.current = true;
+    fetchPage(1)
+      .then((res) => {
+        if (cancelled) return;
+        setItems(res.items || []);
+        setHasMore(!!res.hasMore);
+        setPage(1);
+      })
+      .catch((err) => !cancelled && setError(err.message))
+      .finally(() => {
+        if (cancelled) return;
+        setLoading(false);
+        loadingRef.current = false;
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, fetchPage, page]);
+
+  const loadMore = useCallback(() => {
+    if (loadingRef.current || !hasMore || page === 0) return;
+    loadingRef.current = true;
+    setLoadingMore(true);
+    const next = page + 1;
+    fetchPage(next)
+      .then((res) => {
+        setItems((prev) => [...prev, ...(res.items || [])]);
+        setHasMore(!!res.hasMore);
+        setPage(next);
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => {
+        setLoadingMore(false);
+        loadingRef.current = false;
+      });
+  }, [fetchPage, hasMore, page]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const node = sentinelRef.current;
+    if (!node) return undefined;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) loadMore();
+      },
+      { rootMargin: "150px" }
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [isOpen, loadMore]);
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 shadow-card">
+      <button onClick={onToggle} className="flex w-full items-center justify-between px-4 py-3.5">
+        <div className="flex items-center gap-2">
+          <span className="text-[15px] font-bold text-ink-900 dark:text-white">
+            {group.monthLabel}
+          </span>
+          <span className="rounded-full bg-ink-50 dark:bg-ink-950 px-2 py-0.5 text-xs font-semibold text-ink-500 dark:text-ink-400">
+            {group.count}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="tabular-nums text-sm font-semibold text-ink-700 dark:text-ink-200">
+            ₹{group.totalAmount.toLocaleString("en-IN")}
+          </span>
+          <ChevronRightIcon
+            width={16}
+            height={16}
+            className={`text-ink-300 transition-transform ${isOpen ? "rotate-90" : ""}`}
+          />
+        </div>
+      </button>
+
+      {isOpen && (
+        <div className="border-t border-ink-100 dark:border-ink-800 p-3">
+          {error && <p className="mb-2 text-xs font-medium text-red-600 dark:text-red-400">{error}</p>}
+          {loading ? (
+            <div className="space-y-2">
+              {[0, 1].map((i) => (
+                <div key={i} className="h-16 animate-pulse rounded-xl bg-ink-50 dark:bg-ink-950" />
+              ))}
+            </div>
+          ) : (
+            <>
+              <ul className="space-y-2">
+                {items.map((bill) => (
+                  <BillRow key={bill._id} bill={bill} />
+                ))}
+              </ul>
+              <div ref={sentinelRef} className="h-3" />
+              {loadingMore && (
+                <p className="py-2 text-center text-xs font-medium text-ink-400 dark:text-ink-500">
+                  Loading more bills…
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function BillRow({ bill }) {
+  return (
+    <li>
+      <Link
+        to={`/bills/${bill._id}`}
+        className="flex items-center justify-between gap-3 rounded-xl bg-ink-50/60 p-3 transition-transform active:scale-[0.99]"
+      >
+        <div className="min-w-0">
+          <p className="truncate text-[15px] font-semibold text-ink-900 dark:text-white">
+            {bill.customerName}
+          </p>
+          <p className="mt-0.5 text-xs font-medium text-ink-500 dark:text-ink-400">
+            {formatDate(bill.dateOfIssue)}
+          </p>
+          <p className="mt-0.5 text-base font-extrabold text-red-600 dark:text-red-400">
+            {bill.billNo}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="tabular-nums text-[15px] font-bold text-ink-900 dark:text-white">
+            ₹{bill.totalAmount.toLocaleString("en-IN")}
+          </span>
+          <ChevronRightIcon width={18} height={18} className="text-ink-300" />
+        </div>
+      </Link>
+    </li>
   );
 }
 

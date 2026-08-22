@@ -27,6 +27,20 @@ export function clearApiCache() {
   getCache.clear();
 }
 
+// Turns a params object into a query string, skipping empty/undefined/
+// "all" values so a call with no real filters produces a bare path —
+// this is what keeps the "no params = old unfiltered behavior" contract
+// on the backend working from the frontend side too.
+function toQueryString(params = {}) {
+  const usp = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === "" || value === "all") continue;
+    usp.set(key, String(value));
+  }
+  const qs = usp.toString();
+  return qs ? `?${qs}` : "";
+}
+
 async function request(path, options = {}) {
   const method = (options.method || "GET").toUpperCase();
 
@@ -71,8 +85,10 @@ async function request(path, options = {}) {
 }
 
 // ---------- Customers ----------
-export function getCustomers() {
-  return request("/customers");
+// Called with no args: full unfiltered list (dropdown pickers elsewhere).
+// Called with { q, page, limit }: paginated + searched (Customers tab).
+export function getCustomers(params) {
+  return request(`/customers${toQueryString(params)}`);
 }
 
 export function saveCustomer(customer) {
@@ -87,14 +103,18 @@ export function deleteCustomer(id) {
 }
 
 // ---------- Bills ----------
-export function getBills() {
-  return request("/bills");
+// Called with no args: full unfiltered list (Customer Ledger, etc).
+// Called with { monthKey, customerId, q, page, limit }: paginated/filtered
+// (Dashboard's lazy per-month load and search).
+export function getBills(params) {
+  return request(`/bills${toQueryString(params)}`);
 }
 
-// Returns [{ monthKey, monthLabel, bills, totalAmount, count }, ...]
-// most recent month first.
-export function getBillsGrouped() {
-  return request("/bills/grouped");
+// Returns { items: [{ monthKey, monthLabel, totalAmount, count }, ...],
+// page, limit, total, hasMore } — most recent month first. Bills for a
+// given month are NOT included; fetch them lazily with getBills({ monthKey }).
+export function getBillsGrouped(params) {
+  return request(`/bills/grouped${toQueryString(params)}`);
 }
 
 export function getBill(id) {
@@ -122,8 +142,21 @@ export function computeTotals(items) {
 }
 
 // ---------- Parcels (photo staging, pre-invoice) ----------
-export function getParcels() {
-  return request("/parcels");
+// Called with no args: full unfiltered list (Add-from-Parcels dropdown,
+// Pending Payments calc, Customer Ledger, dealer-bundle item picker).
+// Called with { customerId, status, page, limit }: paginated + filtered
+// (the Parcels tab's per-customer lazy-loaded grid).
+export function getParcels(params) {
+  return request(`/parcels${toQueryString(params)}`);
+}
+
+// Returns { items: [{ key, customerId, customerName, totalCount,
+// pendingCount, latestCreatedAt }], page, limit, total, hasMore } — one
+// row per customer, most recently active first. No parcel photos/documents
+// are fetched here; call getParcels({ customerId, status }) once a group
+// is opened.
+export function getParcelGroups(params) {
+  return request(`/parcels/groups${toQueryString(params)}`);
 }
 
 export function createParcel(payload) {
@@ -138,8 +171,11 @@ export function deleteParcel(id) {
 }
 
 // ---------- Dealer Bills (parcel bundles sent to the dealer) ----------
-export function getDealerBills() {
-  return request("/dealer-bills");
+// Called with no args: full unfiltered list.
+// Called with { status, q, page, limit }: paginated + filtered (Dealer
+// Bills tab: All / Awaiting Price / Priced, plus search).
+export function getDealerBills(params) {
+  return request(`/dealer-bills${toQueryString(params)}`);
 }
 
 export function getDealerBill(id) {

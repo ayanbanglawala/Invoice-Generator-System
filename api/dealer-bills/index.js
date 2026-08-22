@@ -3,6 +3,7 @@ import { applyCors } from "../_cors.js";
 import DealerBill from "../../server/models/DealerBill.js";
 import Parcel from "../../server/models/Parcel.js";
 import { nextBillNumber } from "../../server/lib/billCounter.js";
+import { parsePagination, pageResult, escapeRegex } from "../../server/lib/pagination.js";
 
 const DEALER_BILL_SERIES_OPTIONS = ["AZ", "G"];
 const DEFAULT_DEALER_BILL_SERIES = "AZ";
@@ -12,8 +13,32 @@ export default async function handler(req, res) {
   await connectDb();
 
   if (req.method === "GET") {
-    const bills = await DealerBill.find().sort({ createdAt: -1 });
-    return res.status(200).json(bills);
+    const { status, q, page } = req.query || {};
+    const usePagination = Boolean((status && status !== "all") || q || page);
+
+    if (!usePagination) {
+      const bills = await DealerBill.find().sort({ createdAt: -1 });
+      return res.status(200).json(bills);
+    }
+
+    const match = {};
+    if (status === "packed" || status === "priced") match.status = status;
+    if (q && q.trim()) {
+      const re = new RegExp(escapeRegex(q.trim()), "i");
+      match.$or = [
+        { billNo: re },
+        { "items.name": re },
+        { "items.dNumber": re },
+      ];
+    }
+
+    const { page: p, limit, skip } = parsePagination(req.query, { defaultLimit: 10, maxLimit: 30 });
+    const [items, total] = await Promise.all([
+      DealerBill.find(match).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      DealerBill.countDocuments(match),
+    ]);
+
+    return res.status(200).json(pageResult({ items, page: p, limit, total }));
   }
 
   if (req.method === "POST") {

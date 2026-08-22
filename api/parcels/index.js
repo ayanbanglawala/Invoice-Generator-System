@@ -9,17 +9,40 @@ import Bill from "../../server/models/Bill.js";
 import DealerBill from "../../server/models/DealerBill.js";
 import { uploadParcelImage } from "../../server/lib/blob.js";
 import { nextDNumber } from "../../server/lib/parcelCounter.js";
+import { parsePagination, pageResult } from "../../server/lib/pagination.js";
+import { buildParcelStatusMatch } from "../../server/lib/parcelFilters.js";
 
 export default async function handler(req, res) {
   if (applyCors(req, res)) return;
   await connectDb();
 
   if (req.method === "GET") {
-    const parcels = await Parcel.find()
-      .sort({ createdAt: -1 })
-      .populate("billedBillIds", "billNo")
-      .populate("dealerBillId", "billNo status");
-    return res.status(200).json(parcels);
+    const { customerId, status, page } = req.query || {};
+    const usePagination = Boolean(page || customerId || (status && status !== "all"));
+
+    if (!usePagination) {
+      const parcels = await Parcel.find()
+        .sort({ createdAt: -1 })
+        .populate("billedBillIds", "billNo")
+        .populate("dealerBillId", "billNo status");
+      return res.status(200).json(parcels);
+    }
+
+    const { page: p, limit, skip } = parsePagination(req.query, { defaultLimit: 10, maxLimit: 30 });
+    const match = buildParcelStatusMatch(status) || {};
+    if (customerId) match.customerId = customerId;
+
+    const [items, total] = await Promise.all([
+      Parcel.find(match)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate("billedBillIds", "billNo")
+        .populate("dealerBillId", "billNo status"),
+      Parcel.countDocuments(match),
+    ]);
+
+    return res.status(200).json(pageResult({ items, page: p, limit, total }));
   }
 
   if (req.method === "POST") {

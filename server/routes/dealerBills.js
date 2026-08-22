@@ -3,16 +3,45 @@ import DealerBill from "../models/DealerBill.js";
 import Parcel from "../models/Parcel.js";
 import { applyDealerBillUpdate } from "../lib/dealerBillUpdate.js";
 import { nextBillNumber } from "../lib/billCounter.js";
+import { parsePagination, pageResult, escapeRegex } from "../lib/pagination.js";
 
 const DEALER_BILL_SERIES_OPTIONS = ["AZ", "G"];
 const DEFAULT_DEALER_BILL_SERIES = "AZ";
 
 const router = Router();
 
-// GET /api/dealer-bills
+// GET /api/dealer-bills?status=&q=&page=&limit=
+// Backward-compatible default (no query params): full unfiltered list.
+// Once status/q/page is present: paginated + filtered, used by the
+// Dealer Bills tab's status filter (All / Awaiting Price / Priced) and
+// infinite-scroll list.
 router.get("/", async (req, res) => {
-  const bills = await DealerBill.find().sort({ createdAt: -1 });
-  res.json(bills);
+  const { status, q, page } = req.query;
+  const usePagination = Boolean((status && status !== "all") || q || page);
+
+  if (!usePagination) {
+    const bills = await DealerBill.find().sort({ createdAt: -1 });
+    return res.json(bills);
+  }
+
+  const match = {};
+  if (status === "packed" || status === "priced") match.status = status;
+  if (q && q.trim()) {
+    const re = new RegExp(escapeRegex(q.trim()), "i");
+    match.$or = [
+      { billNo: re },
+      { "items.name": re },
+      { "items.dNumber": re },
+    ];
+  }
+
+  const { page: p, limit, skip } = parsePagination(req.query, { defaultLimit: 10, maxLimit: 30 });
+  const [items, total] = await Promise.all([
+    DealerBill.find(match).sort({ createdAt: -1 }).skip(skip).limit(limit),
+    DealerBill.countDocuments(match),
+  ]);
+
+  res.json(pageResult({ items, page: p, limit, total }));
 });
 
 // POST /api/dealer-bills — bundle selected parcels under a new, auto
