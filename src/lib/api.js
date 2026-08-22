@@ -87,8 +87,20 @@ export function deleteCustomer(id) {
 }
 
 // ---------- Bills ----------
-export function getBills() {
-  return request("/bills");
+export function getBills(params = {}) {
+  const qs = new URLSearchParams(params).toString();
+  return request(`/bills${qs ? `?${qs}` : ""}`);
+}
+
+// Paginated bill fetch for infinite scroll: { bills, page, hasMore }.
+export function getBillsPage(page, limit = 20) {
+  return request(`/bills?page=${page}&limit=${limit}`);
+}
+
+// { count, totalAmount } — a fast aggregate for the Home screen header,
+// instead of downloading every bill just to sum/count them.
+export function getBillsStats() {
+  return request("/bills/stats");
 }
 
 // Returns [{ monthKey, monthLabel, bills, totalAmount, count }, ...]
@@ -122,8 +134,27 @@ export function computeTotals(items) {
 }
 
 // ---------- Parcels (photo staging, pre-invoice) ----------
-export function getParcels() {
-  return request("/parcels");
+export function getParcels(params = {}) {
+  const qs = new URLSearchParams(params).toString();
+  return request(`/parcels${qs ? `?${qs}` : ""}`);
+}
+
+// Paginated parcel fetch for infinite scroll: { parcels, page, hasMore }.
+export function getParcelsPage(page, limit = 24) {
+  return request(`/parcels?page=${page}&limit=${limit}`);
+}
+
+// Only dealer-priced, not-yet-billed parcels — what the Home screen's
+// Pending Payments section actually needs, without pulling in the whole
+// (ever-growing) parcel history.
+export function getPendingParcels() {
+  return request("/parcels/pending");
+}
+
+// { total, pending, billed } — a fast aggregate for header counts on the
+// Parcels tab, instead of downloading every parcel just to count them.
+export function getParcelsStats() {
+  return request("/parcels/stats");
 }
 
 export function createParcel(payload) {

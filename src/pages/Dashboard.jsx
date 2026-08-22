@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import * as store from "../lib/storage";
 import { useAuth } from "../context/AuthContext";
+import { useInfiniteScroll } from "../lib/useInfiniteScroll";
 import {
   LogoutIcon,
   SearchIcon,
@@ -9,6 +10,9 @@ import {
   ReceiptIcon,
   SettingsIcon,
 } from "../components/Icons";
+
+const BILLS_PAGE_SIZE = 20;
+const SEARCH_DEBOUNCE_MS = 350;
 
 function formatDate(iso) {
   const d = new Date(iso);
@@ -36,41 +40,107 @@ function groupPiecesByDealerBill(pieces) {
   return groups;
 }
 
+// Client-side groups the currently-loaded (paginated) bills by month.
+// Since bills arrive from the server already sorted newest-first, this
+// never needs to re-sort — each page's bills either extend the last group
+// or start a new one.
+function groupBillsByMonth(bills) {
+  const groups = [];
+  const indexByMonth = new Map();
+  for (const b of bills) {
+    if (!indexByMonth.has(b.monthKey)) {
+      indexByMonth.set(b.monthKey, groups.length);
+      groups.push({ monthKey: b.monthKey, monthLabel: b.monthLabel, bills: [], totalAmount: 0 });
+    }
+    const g = groups[indexByMonth.get(b.monthKey)];
+    g.bills.push(b);
+    g.totalAmount += b.totalAmount;
+  }
+  return groups;
+}
+
 export default function Dashboard() {
   const { signOut } = useAuth();
   const [query, setQuery] = useState("");
-  const [groups, setGroups] = useState([]);
-  const [parcels, setParcels] = useState([]);
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [bills, setBills] = useState([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
+  const [stats, setStats] = useState({ count: 0, totalAmount: 0 });
+  const [pendingParcels, setPendingParcels] = useState([]);
   const [openMonth, setOpenMonth] = useState(null);
   const [openPendingCustomer, setOpenPendingCustomer] = useState(null);
   const [showPending, setShowPending] = useState(true);
+  const firstLoadDone = useRef(false);
 
+  // Debounce search input so we're not hitting the API on every keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(query.trim()), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  // Stats + pending payments load once — both are lightweight, aggregate
+  // -style endpoints, not the full bill/parcel history.
+  useEffect(() => {
+    store.getBillsStats().then(setStats).catch(() => {});
+    store.getPendingParcels().then(setPendingParcels).catch(() => {});
+  }, []);
+
+  // (Re)load the first page of bills whenever the search term changes.
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    Promise.all([store.getBillsGrouped(), store.getParcels()])
-      .then(([billGroups, parcelList]) => {
+    setLoading(!firstLoadDone.current);
+    setBills([]);
+    setPage(1);
+    setHasMore(true);
+    store
+      .getBills({ page: 1, limit: BILLS_PAGE_SIZE, ...(debouncedQuery ? { q: debouncedQuery } : {}) })
+      .then((res) => {
         if (cancelled) return;
-        setGroups(billGroups);
-        setParcels(parcelList);
-        setOpenMonth(billGroups[0]?.monthKey ?? null);
+        setBills(res.bills);
+        setHasMore(res.hasMore);
+        setOpenMonth(res.bills[0]?.monthKey ?? null);
         setError("");
+        firstLoadDone.current = true;
       })
       .catch((err) => !cancelled && setError(err.message))
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [debouncedQuery]);
+
+  const loadMore = useMemo(
+    () => async () => {
+      if (loadingMore || !hasMore) return;
+      setLoadingMore(true);
+      try {
+        const nextPage = page + 1;
+        const res = await store.getBills({
+          page: nextPage,
+          limit: BILLS_PAGE_SIZE,
+          ...(debouncedQuery ? { q: debouncedQuery } : {}),
+        });
+        setBills((prev) => [...prev, ...res.bills]);
+        setHasMore(res.hasMore);
+        setPage(nextPage);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoadingMore(false);
+      }
+    },
+    [loadingMore, hasMore, page, debouncedQuery]
+  );
+
+  const sentinelRef = useInfiniteScroll({ hasMore, loading: loadingMore, onLoadMore: loadMore });
 
   const pendingPaymentGroups = useMemo(() => {
-    const eligible = parcels.filter(
-      (p) => !p.billedBillIds?.length && p.dealerPrice != null
-    );
     const map = new Map();
-    for (const p of eligible) {
+    for (const p of pendingParcels) {
       const key = p.customerId || p.customerName;
       if (!map.has(key)) {
         map.set(key, { key, customerId: p.customerId, customerName: p.customerName, pieces: [] });
@@ -83,28 +153,12 @@ export default function Dashboard() {
         totalPending: g.pieces.reduce((s, p) => s + (p.dealerPrice || 0), 0),
       }))
       .sort((a, b) => b.totalPending - a.totalPending);
-  }, [parcels]);
+  }, [pendingParcels]);
 
   const totalPendingAmount = pendingPaymentGroups.reduce((s, g) => s + g.totalPending, 0);
   const totalPendingPieces = pendingPaymentGroups.reduce((s, g) => s + g.pieces.length, 0);
 
-  const filteredGroups = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return groups;
-    return groups
-      .map((g) => ({
-        ...g,
-        bills: g.bills.filter(
-          (b) =>
-            b.customerName?.toLowerCase().includes(q) ||
-            b.billNo?.toLowerCase().includes(q)
-        ),
-      }))
-      .filter((g) => g.bills.length > 0);
-  }, [groups, query]);
-
-  const totalInvoices = groups.reduce((s, g) => s + g.count, 0);
-  const totalRevenue = groups.reduce((s, g) => s + g.totalAmount, 0);
+  const groupedBills = useMemo(() => groupBillsByMonth(bills), [bills]);
 
   return (
     <div className="min-h-dvh bg-ink-50 dark:bg-ink-950 pb-28">
@@ -136,13 +190,13 @@ export default function Dashboard() {
           <div className="rounded-xl bg-brand-50 dark:bg-brand-950 p-3">
             <p className="text-[11px] font-medium text-brand-700 dark:text-brand-300">Invoices</p>
             <p className="mt-1 text-base font-bold text-brand-900 dark:text-brand-100">
-              {totalInvoices}
+              {stats.count}
             </p>
           </div>
           <div className="rounded-xl bg-ink-50 dark:bg-ink-950 p-3">
             <p className="text-[11px] font-medium text-ink-500 dark:text-ink-400">Billed</p>
             <p className="mt-1 text-base font-bold text-ink-900 dark:text-white tabular-nums">
-              ₹{totalRevenue.toLocaleString("en-IN")}
+              ₹{stats.totalAmount.toLocaleString("en-IN")}
             </p>
           </div>
           <div className="rounded-xl bg-amber-50 dark:bg-amber-950 p-3">
@@ -186,22 +240,16 @@ export default function Dashboard() {
                   Pending Payments
                 </p>
                 <p className="mt-0.5 text-xs font-medium text-amber-700 dark:text-amber-300">
-                  {totalPendingPieces} piece{totalPendingPieces === 1 ? "" : "s"} priced by
-                  dealer, not yet billed to customer
+                  {totalPendingPieces} pieces priced by dealer, not yet billed to customer
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="tabular-nums text-sm font-extrabold text-amber-900 dark:text-amber-100">
-                  ₹{totalPendingAmount.toLocaleString("en-IN")}
-                </span>
-                <ChevronRightIcon
-                  width={16}
-                  height={16}
-                  className={`text-amber-500 transition-transform ${
-                    showPending ? "rotate-90" : ""
-                  }`}
-                />
-              </div>
+              <ChevronRightIcon
+                width={16}
+                height={16}
+                className={`shrink-0 text-amber-400 transition-transform ${
+                  showPending ? "rotate-90" : ""
+                }`}
+              />
             </button>
 
             {showPending && (
@@ -214,10 +262,8 @@ export default function Dashboard() {
                       className="overflow-hidden rounded-xl border border-amber-100 dark:border-amber-900 bg-white dark:bg-ink-900"
                     >
                       <button
-                        onClick={() =>
-                          setOpenPendingCustomer(isOpen ? null : group.key)
-                        }
-                        className="flex w-full items-center justify-between px-3 py-2.5"
+                        onClick={() => setOpenPendingCustomer(isOpen ? null : group.key)}
+                        className="flex w-full items-center justify-between px-3.5 py-3"
                       >
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-semibold text-ink-900 dark:text-white">
@@ -290,12 +336,12 @@ export default function Dashboard() {
 
         {loading ? (
           <LoadingState />
-        ) : filteredGroups.length === 0 ? (
-          <EmptyState hasQuery={!!query} />
+        ) : groupedBills.length === 0 ? (
+          <EmptyState hasQuery={!!debouncedQuery} />
         ) : (
           <div className="space-y-4">
-            {filteredGroups.map((group) => {
-              const isOpen = openMonth === group.monthKey || !!query;
+            {groupedBills.map((group) => {
+              const isOpen = openMonth === group.monthKey || !!debouncedQuery;
               return (
                 <section
                   key={group.monthKey}
@@ -303,7 +349,7 @@ export default function Dashboard() {
                 >
                   <button
                     onClick={() =>
-                      setOpenMonth(isOpen && !query ? null : group.monthKey)
+                      setOpenMonth(isOpen && !debouncedQuery ? null : group.monthKey)
                     }
                     className="flex w-full items-center justify-between px-4 py-3.5"
                   >
@@ -312,7 +358,7 @@ export default function Dashboard() {
                         {group.monthLabel}
                       </span>
                       <span className="rounded-full bg-ink-50 dark:bg-ink-950 px-2 py-0.5 text-xs font-semibold text-ink-500 dark:text-ink-400">
-                        {group.count}
+                        {group.bills.length}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
@@ -366,6 +412,15 @@ export default function Dashboard() {
                 </section>
               );
             })}
+
+            {/* Infinite scroll sentinel — loads the next page of bills the
+                moment this scrolls near the viewport. Nothing renders once
+                every bill has been loaded. */}
+            {hasMore && (
+              <div ref={sentinelRef} className="flex justify-center py-4">
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-brand-200 border-t-brand-500" />
+              </div>
+            )}
           </div>
         )}
       </main>
