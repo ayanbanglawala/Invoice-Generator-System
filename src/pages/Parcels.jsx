@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState, useCallback, useMemo, memo } from "react";
+import { useEffect, useRef, useState, useCallback, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import * as store from "../lib/storage";
 import { fileToCompressedDataUrl, dataUrlToFile } from "../lib/image";
-import { useInfiniteScroll } from "../lib/useInfiniteScroll";
 import {
   PlusIcon,
   CameraIcon,
@@ -40,18 +39,12 @@ async function parcelToFile(parcel) {
   return new File([blob], `${parcel.dNumber}.${ext}`, { type: blob.type || "image/jpeg" });
 }
 
-const PARCELS_PAGE_SIZE = 24;
-
 export default function Parcels() {
   const navigate = useNavigate();
   const [parcels, setParcels] = useState([]);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState("");
-  const [stats, setStats] = useState({ total: 0, pending: 0, billed: 0 });
   const [customers, setCustomers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   const [showCapture, setShowCapture] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
@@ -61,48 +54,21 @@ export default function Parcels() {
   const [showDealerModal, setShowDealerModal] = useState(false);
   const [openCustomer, setOpenCustomer] = useState(null);
 
-  // Reloads from the very first page — used on mount and any time the list
-  // needs a clean refresh (after a delete, or a new photo is captured).
   function loadParcels() {
     setLoading(true);
-    setHasMore(true);
     return store
-      .getParcelsPage(1, PARCELS_PAGE_SIZE)
-      .then((res) => {
-        setParcels(res.parcels);
-        setPage(1);
-        setHasMore(res.hasMore);
+      .getParcels()
+      .then((data) => {
+        setParcels(data);
         setError("");
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }
 
-  const loadMore = useMemo(
-    () => async () => {
-      if (loadingMore || !hasMore) return;
-      setLoadingMore(true);
-      try {
-        const nextPage = page + 1;
-        const res = await store.getParcelsPage(nextPage, PARCELS_PAGE_SIZE);
-        setParcels((prev) => [...prev, ...res.parcels]);
-        setHasMore(res.hasMore);
-        setPage(nextPage);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoadingMore(false);
-      }
-    },
-    [loadingMore, hasMore, page]
-  );
-
-  const sentinelRef = useInfiniteScroll({ hasMore, loading: loadingMore, onLoadMore: loadMore });
-
   useEffect(() => {
     loadParcels();
     store.getCustomers().then(setCustomers).catch(() => {});
-    store.getParcelsStats().then(setStats).catch(() => {});
   }, []);
 
   function toggleSelectMode() {
@@ -124,7 +90,6 @@ export default function Parcels() {
     try {
       await store.deleteParcel(id);
       await loadParcels();
-      store.getParcelsStats().then(setStats).catch(() => {});
     } catch (err) {
       alert(err.message);
     }
@@ -143,7 +108,6 @@ export default function Parcels() {
       setSelectMode(false);
       setSelectedIds(new Set());
       await loadParcels();
-      store.getParcelsStats().then(setStats).catch(() => {});
     } catch (err) {
       alert(err.message);
     } finally {
@@ -231,20 +195,21 @@ export default function Parcels() {
     }
   }
 
-  // Group by customer, most recently active customer first. Since parcels
-  // arrive from the server already sorted newest-first, each page's
-  // parcels either extend the last group or start a new one as they load.
-  const customerGroups = useMemo(() => {
-    const groupMap = new Map();
-    for (const p of parcels) {
-      const key = p.customerId || p.customerName;
-      if (!groupMap.has(key)) {
-        groupMap.set(key, { key, customerName: p.customerName, parcels: [] });
-      }
-      groupMap.get(key).parcels.push(p);
+  const pendingCount = parcels.filter((p) => !p.billedBillIds?.length).length;
+  const billedCount = parcels.length - pendingCount;
+
+  // Group by customer, most recently active customer first.
+  const groupMap = new Map();
+  for (const p of parcels) {
+    const key = p.customerId || p.customerName;
+    if (!groupMap.has(key)) {
+      groupMap.set(key, { key, customerName: p.customerName, parcels: [] });
     }
-    return Array.from(groupMap.values());
-  }, [parcels]);
+    groupMap.get(key).parcels.push(p);
+  }
+  const customerGroups = Array.from(groupMap.values()).sort(
+    (a, b) => new Date(b.parcels[0].createdAt) - new Date(a.parcels[0].createdAt)
+  );
 
   return (
     <div className="min-h-dvh bg-ink-50 dark:bg-ink-950 pb-28">
@@ -252,7 +217,7 @@ export default function Parcels() {
         <div>
           <h1 className="text-xl font-bold text-ink-900 dark:text-white">Parcels</h1>
           <p className="mt-0.5 text-sm text-ink-500 dark:text-ink-400">
-            {stats.pending} pending · {stats.billed} billed
+            {pendingCount} pending · {billedCount} billed
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -349,14 +314,6 @@ export default function Parcels() {
                 </section>
               );
             })}
-
-            {/* Infinite scroll sentinel — loads the next page of parcels
-                the moment this scrolls near the viewport. */}
-            {hasMore && (
-              <div ref={sentinelRef} className="flex justify-center py-4">
-                <div className="h-6 w-6 animate-spin rounded-full border-2 border-brand-200 border-t-brand-500" />
-              </div>
-            )}
           </div>
         )}
       </main>
@@ -406,10 +363,7 @@ export default function Parcels() {
         <CaptureSheet
           customers={customers}
           onClose={() => setShowCapture(false)}
-          onSaved={() => {
-            loadParcels();
-            store.getParcelsStats().then(setStats).catch(() => {});
-          }}
+          onSaved={loadParcels}
         />
       )}
     </div>
